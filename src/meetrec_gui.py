@@ -151,13 +151,16 @@ class LevelMeter:
         self.w = int(canvas["width"])
         self.h = int(canvas["height"])
         self.bars = []
-        self.num_channels = num_channels
+        self.num_channels = num_channels  # Antal kanaler att visa i GUI
         self.running = False
         self.stream = None
         self.samplerate = samplerate
         self.device = device
         self.q = queue.Queue()
         self.gain = gain  # Volymförstärkning (1.0 = normal, 2.0 = dubbel, etc.)
+        
+        # Försök hitta enhetens faktiska kanalantal för att fånga alla mikrofoner
+        self.device_channels = self._get_device_channels()
 
         margin = 10
         gap = 8
@@ -185,14 +188,33 @@ class LevelMeter:
             t = self.canvas.create_text((x0+x1)//2, y1+20, text="0%", anchor="n", font=("TkDefaultFont", 9), fill="#aaa")
             self.value_labels.append(t)
 
+    def _get_device_channels(self):
+        """Hämta enhetens maximala antal ingångskanaler"""
+        try:
+            if self.device is None:
+                # Använd standardenhet
+                device_info = sd.query_devices(kind='input')
+            else:
+                device_info = sd.query_devices(self.device)
+            
+            max_channels = device_info.get('max_input_channels', self.num_channels)
+            # För ReSpeaker 4-Mic Array v2.0 har ofta 6 kanaler (4 mic + 2 ref)
+            # Öppna med alla tillgängliga kanaler för att fånga alla mikrofoner
+            return max_channels
+        except Exception as e:
+            # Om det inte går att hämta info, använd num_channels som fallback
+            return self.num_channels
+
     def _audio_callback(self, indata, frames, time_info, status):
         if status:
             pass
         # Normalisera int16 data (-32768 till 32767) till float (-1.0 till 1.0)
+        # indata har form (frames, channels) där channels = device_channels
         normalized = indata.astype(np.float32) / 32768.0
         # Applicera gain
         normalized = normalized * self.gain
-        # Beräkna RMS per kanal
+        # Beräkna RMS per kanal (axis=0 ger en RMS-värde per kanal)
+        # Detta beräknar RMS för ALLA kanaler från enheten
         with np.errstate(invalid='ignore'):
             rms = np.sqrt(np.mean(np.square(normalized), axis=0))
         # Klipp till 0.0-1.0 efter gain är applicerad
@@ -204,8 +226,11 @@ class LevelMeter:
             return
         self.running = True
         try:
+            # Öppna stream med alla tillgängliga kanaler från enheten
+            # Detta säkerställer att alla mikrofoner fångas, även om de är
+            # mappade till högre kanalnummer (t.ex. kanal 4-5 på ReSpeaker)
             self.stream = sd.InputStream(
-                channels=self.num_channels,
+                channels=self.device_channels,
                 samplerate=self.samplerate,
                 dtype="int16",
                 device=self.device,
@@ -232,6 +257,8 @@ class LevelMeter:
         try:
             while True:
                 rms = self.q.get_nowait()
+                # Visa endast de första num_channels kanalerna i GUI:t
+                # även om enheten har fler kanaler (t.ex. 6 kanaler men visa bara 4)
                 for i in range(min(self.num_channels, len(rms))):
                     rect, (x0,y0,x1,y1) = self.bars[i]
                     height = int((y1 - y0) * (1.0 - rms[i]))
@@ -347,7 +374,11 @@ class App(tk.Tk):
             if not self.test_active:
                 self.meter.start()
                 self.test_active = True
-                self.status_var.set(f"Testläge: visa nivåer ({self.meter.num_channels} ch)")
+                # Visa information om hur många kanaler som fångas vs visas
+                if self.meter.device_channels != self.meter.num_channels:
+                    self.status_var.set(f"Testläge: {self.meter.device_channels} ch fångade, {self.meter.num_channels} visas")
+                else:
+                    self.status_var.set(f"Testläge: visa nivåer ({self.meter.num_channels} ch)")
                 self.btn_test.configure(text="Stoppa test")
             else:
                 self.meter.stop()
