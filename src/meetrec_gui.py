@@ -397,7 +397,13 @@ class App(tk.Tk):
             self.after(400, lambda: self.configure(bg="#111"))
 
 def main():
-    app = App()
+    try:
+        app = App()
+    except tk.TclError as exc:
+        print("Kunde inte starta GUI:", exc, file=sys.stderr)
+        if not os.environ.get("DISPLAY"):
+            print("Miljövariabeln DISPLAY saknas. Kör i en miljö med grafikstöd eller sätt DISPLAY.", file=sys.stderr)
+        sys.exit(1)
     app.mainloop()
 
 if __name__ == "__main__":
