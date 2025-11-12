@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=MeetRec GUI
+Comment=Mötesinspelare med Google Drive-upload
+Exec=/home/pi/meetrec/bin/python /home/pi/meetrec-pi/src/meetrec_gui.py
+Terminal=false
+X-GNOME-Autostart-enabled=true

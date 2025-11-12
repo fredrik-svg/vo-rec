@@ -1,0 +1,19 @@
+[Unit]
+Description=Meeting Recorder GUI (Tkinter) with Google Drive upload
+After=graphical.target network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/home/pi/meetrec-pi
+ExecStart=/home/pi/meetrec/bin/python /home/pi/meetrec-pi/src/meetrec_gui.py
+Restart=on-failure
+RestartSec=5
+# Ladda env (justera sökväg om .env ligger annorstädes)
+EnvironmentFile=-/home/pi/meetrec-pi/.env
+
+[Install]
+WantedBy=graphical.target
