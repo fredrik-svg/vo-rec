@@ -136,7 +136,6 @@ def upload_file(flac_path: Path):
                 body=file_metadata,
                 media_body=media,
                 fields="id, name, webViewLink, webContentLink",
-                supportsAllDrives=True,
             ).execute()
             link = file.get("webViewLink") or file.get("webContentLink") or f"gdrive:file:{file.get('id')}"
             return True, f"{file.get('name')} → {link}"
