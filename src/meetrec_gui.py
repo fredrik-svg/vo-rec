@@ -130,7 +130,7 @@ def upload_file(flac_path: Path):
             if not DRIVE_FOLDER_ID:
                 return False, "DRIVE_FOLDER_ID saknas"
             service = get_drive_service()
-            media = MediaFileUpload(str(flac_path), mimetype="audio/flac", resumable=True)
+            media = MediaFileUpload(str(flac_path), mimetype="audio/flac", resumable=False)
             file_metadata = {"name": flac_path.name, "parents": [DRIVE_FOLDER_ID]}
             file = service.files().create(
                 body=file_metadata,
