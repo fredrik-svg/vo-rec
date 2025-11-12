@@ -57,7 +57,10 @@ set -a; source .env; set +a
 source ~/meetrec/bin/activate
 python src/meetrec_gui.py
 ```
-- **Testa nivåer** visar VU-staplar (RMS) för `CHANNELS_TEST` kanaler.
+- **Testa nivåer** visar VU-staplar (RMS) för `CHANNELS_TEST` kanaler med realtidsvärden i procent och dB.
+  - Varje kanal visar aktuell nivå både visuellt och numeriskt
+  - Använd **Volymkontroll (Gain)**-reglaget för att justera ingående ljudnivå (0.1x - 5.0x)
+  - Standardvärde är 1.0x (ingen förstärkning)
 - **Starta inspelning** skapar WAV (mono, 16 kHz), visar stor röd **REC** + timer.
 - **Stoppa & ladda upp** konverterar till FLAC och laddar upp till Drive.
 - Statusfältet visar resultat och en länk (webViewLink) om allt gick bra.
@@ -89,6 +92,7 @@ git push -u origin main
 ## 7) Vanliga justeringar
 - **Välj ljudenhet**: sätt `ALSA_DEVICE = "hw:1,0"` i koden om flera ljudkort finns. Hitta ID med `arecord -l`.
 - **Kanalantal i testläget**: justera `CHANNELS_TEST` (t.ex. 4 eller 6 för ReSpeaker v2.0).
+- **Volymkontroll**: Använd Gain-reglaget i GUI:t för att justera mikrofonnivåer i realtid (0.1x - 5.0x). Om ljud är för svagt, öka gain; om staplarna klipps vid max, minska gain.
 - **Mono/FLAC**: transkriberingstjänster föredrar ofta mono 16 kHz. Du kan höja kvalitet, alternativt spara fler kanaler.
 
 ---

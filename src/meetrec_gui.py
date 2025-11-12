@@ -147,7 +147,7 @@ def upload_file(flac_path: Path):
 
 # ========= Ljudnivåmätning (Testläge) =========
 class LevelMeter:
-    def __init__(self, canvas: tk.Canvas, num_channels=4, samplerate=SAMPLE_RATE, device=ALSA_DEVICE):
+    def __init__(self, canvas: tk.Canvas, num_channels=4, samplerate=SAMPLE_RATE, device=ALSA_DEVICE, gain=1.0):
         self.canvas = canvas
         self.w = int(canvas["width"])
         self.h = int(canvas["height"])
@@ -158,6 +158,7 @@ class LevelMeter:
         self.samplerate = samplerate
         self.device = device
         self.q = queue.Queue()
+        self.gain = gain  # Volymförstärkning (1.0 = normal, 2.0 = dubbel, etc.)
 
         margin = 10
         gap = 8
@@ -166,22 +167,36 @@ class LevelMeter:
             x0 = margin + i*(bar_w+gap)
             y0 = margin
             x1 = x0 + bar_w
-            y1 = self.h - margin
+            y1 = self.h - margin - 30  # Mer utrymme för värden
             rect = self.canvas.create_rectangle(x0, y1, x1, y0, fill="#4caf50")
             self.canvas.coords(rect, x0, y1, x1, y1)
             self.bars.append((rect, (x0, y0, x1, y1)))
 
+        # Kanallabels
         self.labels = []
         for i in range(num_channels):
             x0,y0,x1,y1 = self.bars[i][1]
             t = self.canvas.create_text((x0+x1)//2, y1+5, text=f"CH{i+1}", anchor="n", font=("TkDefaultFont", 10))
             self.labels.append(t)
+        
+        # Värdelabels (dB/procent)
+        self.value_labels = []
+        for i in range(num_channels):
+            x0,y0,x1,y1 = self.bars[i][1]
+            t = self.canvas.create_text((x0+x1)//2, y1+20, text="0%", anchor="n", font=("TkDefaultFont", 9), fill="#aaa")
+            self.value_labels.append(t)
 
     def _audio_callback(self, indata, frames, time_info, status):
         if status:
             pass
+        # Normalisera int16 data (-32768 till 32767) till float (-1.0 till 1.0)
+        normalized = indata.astype(np.float32) / 32768.0
+        # Applicera gain
+        normalized = normalized * self.gain
+        # Beräkna RMS per kanal
         with np.errstate(invalid='ignore'):
-            rms = np.sqrt(np.mean(np.square(indata.astype(np.float32)), axis=0))
+            rms = np.sqrt(np.mean(np.square(normalized), axis=0))
+        # Klipp till 0.0-1.0 efter gain är applicerad
         rms = np.clip(rms, 0.0, 1.0)
         self.q.put(rms)
 
@@ -223,10 +238,23 @@ class LevelMeter:
                     height = int((y1 - y0) * (1.0 - rms[i]))
                     new_top = y0 + height
                     self.canvas.coords(rect, x0, new_top, x1, y1)
+                    
+                    # Uppdatera värdelabel
+                    percent = int(rms[i] * 100)
+                    # Beräkna dB (20 * log10(rms)), men undvik log(0)
+                    if rms[i] > 0.001:
+                        db = 20 * np.log10(rms[i])
+                        self.canvas.itemconfig(self.value_labels[i], text=f"{percent}% ({db:.0f}dB)")
+                    else:
+                        self.canvas.itemconfig(self.value_labels[i], text=f"{percent}%")
         except queue.Empty:
             pass
         if self.running:
             self.canvas.after(50, self._tick)
+    
+    def set_gain(self, gain):
+        """Uppdatera gain-värdet"""
+        self.gain = max(0.1, min(10.0, gain))
 
 # ========= GUI-app =========
 class App(tk.Tk):
@@ -264,7 +292,29 @@ class App(tk.Tk):
         # Canvas för nivåmätare
         self.canvas = tk.Canvas(self, width=760, height=300, bg="#222", highlightthickness=0)
         self.canvas.pack(pady=10)
-        self.meter = LevelMeter(self.canvas, num_channels=CHANNELS_TEST, samplerate=SAMPLE_RATE, device=ALSA_DEVICE)
+        
+        # Volymkontroll (Gain)
+        gain_frame = tk.Frame(self, bg="#111")
+        gain_frame.pack(fill="x", pady=5, padx=20)
+        
+        gain_label = ttk.Label(gain_frame, text="Volymkontroll (Gain):", font=("Arial", 14))
+        gain_label.pack(side="left", padx=5)
+        
+        self.gain_var = tk.DoubleVar(value=1.0)
+        self.gain_value_label = ttk.Label(gain_frame, text="1.0x", font=("Arial", 14), width=6)
+        self.gain_value_label.pack(side="right", padx=5)
+        
+        self.gain_slider = ttk.Scale(
+            gain_frame, 
+            from_=0.1, 
+            to=5.0, 
+            orient="horizontal",
+            variable=self.gain_var,
+            command=self.on_gain_change
+        )
+        self.gain_slider.pack(side="left", fill="x", expand=True, padx=10)
+        
+        self.meter = LevelMeter(self.canvas, num_channels=CHANNELS_TEST, samplerate=SAMPLE_RATE, device=ALSA_DEVICE, gain=1.0)
 
         # Stor röd REC-indikator + timer i mitten
         self.rec_var = tk.StringVar(value="")
@@ -284,6 +334,12 @@ class App(tk.Tk):
         self.test_active = False
 
     # ---------- Handlers ----------
+    def on_gain_change(self, value):
+        """Hantera ändring av gain-slider"""
+        gain = float(value)
+        self.gain_value_label.configure(text=f"{gain:.1f}x")
+        self.meter.set_gain(gain)
+    
     def on_test_levels(self):
         if self.record_proc is not None:
             self.flash_status("Kan inte testa nivåer under inspelning", warn=True)
