@@ -92,6 +92,9 @@ git push -u origin main
 ## 7) Vanliga justeringar
 - **Välj ljudenhet**: sätt `ALSA_DEVICE = "hw:1,0"` i koden om flera ljudkort finns. Hitta ID med `arecord -l`.
 - **Kanalantal i testläget**: justera `CHANNELS_TEST` (t.ex. 4 eller 6 för ReSpeaker v2.0).
+  - Systemet öppnar automatiskt alla tillgängliga kanaler från enheten för att fånga alla mikrofoner
+  - GUI:t visar de första `CHANNELS_TEST` kanalerna
+  - För ReSpeaker 4-Mic Array v2.0 med 6 kanaler (4 mic + 2 ref), sätt `CHANNELS_TEST=4` för att visa de fyra mikrofonerna
 - **Volymkontroll**: Använd Gain-reglaget i GUI:t för att justera mikrofonnivåer i realtid (0.1x - 5.0x). Om ljud är för svagt, öka gain; om staplarna klipps vid max, minska gain.
 - **Mono/FLAC**: transkriberingstjänster föredrar ofta mono 16 kHz. Du kan höja kvalitet, alternativt spara fler kanaler.
 
