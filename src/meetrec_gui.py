@@ -275,7 +275,7 @@ class App(tk.Tk):
 
         top = tk.Frame(self, bg="#111")
         top.pack(fill="x", pady=10)
-        ttk.Label(top, textvariable=self.status_var, font=("Arial", 20)).pack(side="left", padx=20)
+        ttk.Label(top, textvariable=self.status_var, font=("Arial", 14)).pack(side="left", padx=20)
         ttk.Label(top, text="Tid:", font=("Arial", 20)).pack(side="right", padx=(0,5))
         ttk.Label(top, textvariable=self.time_var, font=("Arial", 20)).pack(side="right", padx=(0,20))
 
