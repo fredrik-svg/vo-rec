@@ -292,16 +292,46 @@ class App(tk.Tk):
 
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
-        self.style.configure("TButton", font=("Arial", 18), padding=10)
-        self.style.configure("Big.TButton", font=("Arial", 24), padding=16)
+        # Konfigurera button-stil med vit text och vit outline
+        self.style.configure("TButton", 
+                           font=("Arial", 18), 
+                           padding=10, 
+                           foreground="white",
+                           background="#333",
+                           bordercolor="white",
+                           lightcolor="white",
+                           darkcolor="white",
+                           borderwidth=2,
+                           relief="solid")
+        self.style.configure("Big.TButton", 
+                           font=("Arial", 24), 
+                           padding=16, 
+                           foreground="white",
+                           background="#333",
+                           bordercolor="white",
+                           lightcolor="white",
+                           darkcolor="white",
+                           borderwidth=2,
+                           relief="solid")
+        # Map för att behålla vit text vid interaktion
+        self.style.map("TButton", 
+                      foreground=[("active", "white"), ("!disabled", "white")],
+                      background=[("active", "#444"), ("!disabled", "#333")])
+        self.style.map("Big.TButton", 
+                      foreground=[("active", "white"), ("!disabled", "white")],
+                      background=[("active", "#444"), ("!disabled", "#333")])
+        self.style.configure("TLabel", background="#111", foreground="white")
 
         # Statusrad (liten)
         self.status_var = tk.StringVar(value="Klar")
         self.time_var = tk.StringVar(value="00:00:00")
 
         top = tk.Frame(self, bg="#111")
-        top.pack(fill="x", pady=10)
-        ttk.Label(top, textvariable=self.status_var, font=("Arial", 14)).pack(side="left", padx=20)
+        top.pack(fill="both", expand=False, pady=10)
+        # Använd tk.Label istället för ttk.Label för bättre wrapping-stöd
+        self.status_label = tk.Label(top, textvariable=self.status_var, font=("Arial", 14), 
+                                     bg="#111", fg="white", anchor="w", justify="left", wraplength=550)
+        self.status_label.pack(side="left", padx=20, fill="x", expand=True)
         ttk.Label(top, text="Tid:", font=("Arial", 20)).pack(side="right", padx=(0,5))
         ttk.Label(top, textvariable=self.time_var, font=("Arial", 20)).pack(side="right", padx=(0,20))
 
