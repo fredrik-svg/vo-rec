@@ -6,7 +6,7 @@ Enkel touch-baserad inspelare för Raspberry Pi + ReSpeaker (eller annan USB-mik
 - Har **stor röd REC-indikator** + **centrerad timer** under inspelning
 - Konverterar WAV → FLAC med ffmpeg
 - Laddar upp filen till **Google Drive** (Service Account eller OAuth)
-- (Valfritt) Stöd finns kvar för S3/HTTP om du vill växla senare
+- (Valfritt) Stöd finns kvar för S3/HTTP/n8n om du vill växla senare
 
 ## 1) Förkrav (OS-paket)
 ```bash
@@ -156,6 +156,31 @@ DRIVE_SERVICE_ACCOUNT_JSON="/home/pi/meetrec/sa.json"  # sökväg till din SA-ny
 - **Token har upphört**: Ta bort `token.json` och kör autentiseringsprocessen igen
 - **Felaktig client_secret.json**: Kontrollera att filen är korrekt nedladdad och inte är tom eller korrupt
 - **Nätverksfel**: Se till att Raspberry Pi har internetåtkomst för att nå Google-servrar
+
+### Konfiguration av n8n workflow (alternativ uppladdning)
+
+**n8n** är ett workflow automation-verktyg som kan ta emot filer via webhooks. Detta är ett enkelt sätt att automatiskt bearbeta inspelningar:
+
+1. **Skapa en n8n workflow** med en Webhook-nod
+   - Sätt webhook-noden till att acceptera POST-förfrågningar
+   - Konfigurera den att ta emot filer (multipart/form-data)
+   - Filen kommer att skickas med fältnamnet "file"
+
+2. **Kopiera webhook-URL:en** från n8n (visas i webhook-nodens inställningar)
+
+3. **Konfigurera .env**:
+   ```bash
+   UPLOAD_TARGET="n8n"
+   N8N_WEBHOOK_URL="https://your-n8n-instance.com/webhook/your-workflow-id"
+   # Valfritt, om din webhook kräver autentisering:
+   N8N_AUTH_HEADER="Bearer your-token-here"
+   ```
+
+4. **I din n8n workflow** kan du sedan:
+   - Transkribera ljudet med en AI-tjänst
+   - Spara filen till en molntjänst
+   - Skicka notifikationer
+   - Extrahera insikter och metadata
 
 Läs in env i din shell-session:
 ```bash

@@ -26,6 +26,8 @@ S3_BUCKET     = os.getenv("S3_BUCKET")
 S3_ENDPOINT   = os.getenv("S3_ENDPOINT_URL")
 HTTP_UPLOAD_URL   = os.getenv("HTTP_UPLOAD_URL")
 HTTP_AUTH_HEADER  = os.getenv("HTTP_AUTH_HEADER")
+N8N_WEBHOOK_URL   = os.getenv("N8N_WEBHOOK_URL")
+N8N_AUTH_HEADER   = os.getenv("N8N_AUTH_HEADER")
 
 # ---- Google Drive ----
 from googleapiclient.discovery import build
@@ -135,6 +137,24 @@ def upload_file(flac_path: Path):
                 return False, f"HTTP {r.status_code}: {r.text[:200]}"
         except Exception as e:
             return False, f"HTTP-fel: {e}"
+
+    elif UPLOAD_TARGET == "n8n":
+        try:
+            if not N8N_WEBHOOK_URL:
+                return False, "N8N_WEBHOOK_URL saknas"
+            import requests
+            headers = {}
+            if N8N_AUTH_HEADER:
+                headers["Authorization"] = N8N_AUTH_HEADER
+            with open(flac_path, "rb") as f:
+                files = {"file": (flac_path.name, f, "audio/flac")}
+                r = requests.post(N8N_WEBHOOK_URL, files=files, headers=headers, timeout=180)
+            if r.status_code // 100 == 2:
+                return True, f"n8n webhook {r.status_code} → {flac_path.name}"
+            else:
+                return False, f"n8n webhook {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            return False, f"n8n-fel: {e}"
 
     elif UPLOAD_TARGET == "gdrive":
         try:
