@@ -93,9 +93,20 @@ def wav_to_flac(wav_path: Path):
     r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if r.returncode != 0:
         return False, None, "Konvertering WAV->FLAC misslyckades"
+    # Verifiera att FLAC-filen faktiskt skapades
+    if not flac_path.exists():
+        return False, None, f"FLAC-filen skapades inte: {flac_path}"
+    if flac_path.stat().st_size == 0:
+        return False, None, f"FLAC-filen är tom: {flac_path}"
     return True, flac_path, "ok"
 
 def upload_file(flac_path: Path):
+    # Verifiera att filen existerar innan upload (gäller alla metoder)
+    if not flac_path.exists():
+        return False, f"Uppladdningsfel: Filen finns inte: {flac_path}"
+    if flac_path.stat().st_size == 0:
+        return False, f"Uppladdningsfel: Filen är tom: {flac_path}"
+    
     if UPLOAD_TARGET == "s3":
         try:
             import boto3
