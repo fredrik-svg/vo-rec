@@ -224,7 +224,125 @@ git remote add origin git@github.com:<ditt-konto>/<ditt-repo>.git
 git push -u origin main
 ```
 
-## 7) Vanliga justeringar
+## 7) MQTT-fjärrstyrning och konfiguration
+
+Mötesinspelaren stöder MQTT-baserad fjärrstyrning och konfigurationshantering. Detta gör det möjligt att:
+- Starta/stoppa inspelningar på distans
+- Övervaka enhetens status
+- Konfigurera parametrar som webhook, rum och e-post
+- Hantera WiFi-inställningar
+
+### Aktivera MQTT
+
+Lägg till följande i `.env`:
+
+```bash
+# Aktivera MQTT-kontroll
+MQTT_ENABLED=true
+
+# MQTT Broker-inställningar
+MQTT_BROKER=mqtt.example.com        # Din MQTT-broker
+MQTT_PORT=1883                       # Port (1883 standard, 8883 för TLS)
+MQTT_USERNAME=your_username          # Valfritt
+MQTT_PASSWORD=your_password          # Valfritt
+MQTT_TOPIC_PREFIX=meetrec/device1    # Unikt för varje enhet
+
+# Enhetskonfiguration
+DEVICE_ROOM=Konferensrum A           # Vilket rum enheten är i
+DEVICE_EMAIL=recordings@example.com  # E-post för notifikationer
+DEVICE_WEBHOOK_URL=https://...       # Webhook för anpassad hantering
+```
+
+### MQTT Topics
+
+Enheten använder följande topics (med prefix `meetrec/device1` som exempel):
+
+**Kommandon (subscribe):**
+- `meetrec/device1/command` - Skicka kommandon till enheten
+  - `start` - Starta inspelning
+  - `stop` - Stoppa inspelning och ladda upp
+  - `test` - Starta/stoppa nivåtest
+
+**Status (publish):**
+- `meetrec/device1/status` - Enhetens aktuella status
+  - `ready` - Redo för inspelning
+  - `recording` - Inspelning pågår
+  - `processing` - Konverterar inspelning
+  - `converting` - Konverterar WAV→FLAC
+  - `uploading` - Laddar upp
+  - `error` - Fel uppstod
+
+**Konfiguration:**
+- `meetrec/device1/config` - Nuvarande konfiguration (publish)
+- `meetrec/device1/config/set` - Uppdatera konfiguration (subscribe)
+
+**Inspelningar:**
+- `meetrec/device1/recording` - Information om färdiga inspelningar
+
+### Konfigurera enheten via MQTT
+
+Skicka ett JSON-meddelande till `meetrec/device1/config/set`:
+
+```json
+{
+  "room": "Konferensrum B",
+  "email": "ny-adress@example.com",
+  "webhook_url": "https://webhook.site/your-id",
+  "upload_target": "n8n",
+  "n8n_webhook_url": "https://n8n.example.com/webhook/abc123"
+}
+```
+
+**WiFi-konfiguration:**
+```json
+{
+  "wifi_ssid": "DittWiFi",
+  "wifi_password": "dittlösenord"
+}
+```
+
+### Exempel med mosquitto_pub
+
+```bash
+# Starta inspelning
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "start"
+
+# Stoppa inspelning
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "stop"
+
+# Uppdatera rum
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/config/set" -m '{"room":"Konferensrum C"}'
+
+# Lyssna på status
+mosquitto_sub -h mqtt.example.com -t "meetrec/device1/#"
+```
+
+### Home Assistant integration
+
+Exempel på Home Assistant-konfiguration för att styra inspelaren:
+
+```yaml
+mqtt:
+  button:
+    - name: "Meetrec Start Recording"
+      command_topic: "meetrec/device1/command"
+      payload_press: "start"
+    
+    - name: "Meetrec Stop Recording"
+      command_topic: "meetrec/device1/command"
+      payload_press: "stop"
+  
+  sensor:
+    - name: "Meetrec Status"
+      state_topic: "meetrec/device1/status"
+      value_template: "{{ value_json.status }}"
+    
+    - name: "Meetrec Room"
+      state_topic: "meetrec/device1/config"
+      value_template: "{{ value_json.room }}"
+```
+
+## 8) Vanliga justeringar
 - **Välj ljudenhet**: sätt `ALSA_DEVICE = "hw:1,0"` i koden om flera ljudkort finns. Hitta ID med `arecord -l`.
 - **Kanalantal i testläget**: justera `CHANNELS_TEST` (t.ex. 4 eller 6 för ReSpeaker v2.0).
   - Systemet öppnar automatiskt alla tillgängliga kanaler från enheten för att fånga alla mikrofoner
