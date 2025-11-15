@@ -29,6 +29,14 @@ HTTP_AUTH_HEADER  = os.getenv("HTTP_AUTH_HEADER")
 N8N_WEBHOOK_URL   = os.getenv("N8N_WEBHOOK_URL")
 N8N_AUTH_HEADER   = os.getenv("N8N_AUTH_HEADER")
 
+# MQTT konfiguration
+MQTT_BROKER       = os.getenv("MQTT_BROKER")
+MQTT_PORT         = int(os.getenv("MQTT_PORT", "8883"))
+MQTT_USERNAME     = os.getenv("MQTT_USERNAME")
+MQTT_PASSWORD     = os.getenv("MQTT_PASSWORD")
+MQTT_TOPIC        = os.getenv("MQTT_TOPIC", "recordings/meetings")
+MQTT_USE_TLS      = os.getenv("MQTT_USE_TLS", "true").lower() in ("true", "1", "yes")
+
 # ---- Google Drive ----
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -172,6 +180,59 @@ def upload_file(flac_path: Path):
             return True, f"{file.get('name')} → {link}"
         except Exception as e:
             return False, f"GDrive-fel: {e}"
+    
+    elif UPLOAD_TARGET == "mqtt":
+        try:
+            if not MQTT_BROKER:
+                return False, "MQTT_BROKER saknas"
+            if not MQTT_USERNAME or not MQTT_PASSWORD:
+                return False, "MQTT_USERNAME eller MQTT_PASSWORD saknas"
+            
+            import paho.mqtt.client as mqtt
+            import json
+            import base64
+            
+            # Läs filen och konvertera till base64
+            with open(flac_path, "rb") as f:
+                file_data = f.read()
+            file_base64 = base64.b64encode(file_data).decode('utf-8')
+            
+            # Skapa MQTT-meddelande med filmetadata
+            message = {
+                "filename": flac_path.name,
+                "timestamp": datetime.now().isoformat(),
+                "size": len(file_data),
+                "mimetype": "audio/flac",
+                "data": file_base64
+            }
+            
+            # Skapa MQTT-klient
+            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"meetrec_{ts_name()}", protocol=mqtt.MQTTv311)
+            client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+            
+            # Konfigurera TLS för HiveMQ Cloud
+            if MQTT_USE_TLS:
+                import ssl
+                client.tls_set(cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2)
+            
+            # Anslut till broker
+            client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+            
+            # Publicera meddelandet
+            result = client.publish(MQTT_TOPIC, json.dumps(message), qos=1)
+            
+            # Vänta på att meddelandet ska skickas
+            result.wait_for_publish(timeout=30)
+            
+            # Koppla från
+            client.disconnect()
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                return True, f"MQTT: {flac_path.name} publicerad till {MQTT_TOPIC}"
+            else:
+                return False, f"MQTT-fel: Publish misslyckades med kod {result.rc}"
+        except Exception as e:
+            return False, f"MQTT-fel: {e}"
     else:
         return False, f"Okänt UPLOAD_TARGET: {UPLOAD_TARGET}"
 
