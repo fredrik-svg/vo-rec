@@ -36,16 +36,13 @@ class MQTTClient:
             raise RuntimeError("paho-mqtt är inte installerat. Installera med: pip install paho-mqtt")
         
         self.enabled = config.get("enabled", False)
-        if not self.enabled:
-            return
-            
         self.broker = config.get("broker", "localhost")
         self.port = int(config.get("port", 1883))
         self.username = config.get("username")
         self.password = config.get("password")
         self.topic_prefix = config.get("topic_prefix", "meetrec/device")
         
-        # MQTT topics
+        # MQTT topics (sätts alltid, även om disabled)
         self.topic_command = f"{self.topic_prefix}/command"
         self.topic_status = f"{self.topic_prefix}/status"
         self.topic_config = f"{self.topic_prefix}/config"
@@ -58,6 +55,13 @@ class MQTTClient:
         self.on_test_callback: Optional[Callable] = None
         self.on_config_update_callback: Optional[Callable[[Dict], None]] = None
         
+        # Client (skapas bara om enabled)
+        self.client = None
+        self.connected = False
+        
+        if not self.enabled:
+            return
+        
         # Client
         self.client = mqtt.Client()
         self.client.on_connect = self._on_connect
@@ -66,8 +70,7 @@ class MQTTClient:
         
         if self.username and self.password:
             self.client.username_pw_set(self.username, self.password)
-        
-        self.connected = False
+
         
     def connect(self):
         """Anslut till MQTT-broker"""
@@ -85,7 +88,7 @@ class MQTTClient:
     
     def disconnect(self):
         """Koppla från MQTT-broker"""
-        if self.enabled:
+        if self.enabled and self.client:
             self.client.loop_stop()
             self.client.disconnect()
             self.connected = False
