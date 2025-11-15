@@ -247,11 +247,53 @@ MQTT_USERNAME=your_username          # Valfritt
 MQTT_PASSWORD=your_password          # Valfritt
 MQTT_TOPIC_PREFIX=meetrec/device1    # Unikt för varje enhet
 
+# TLS/SSL (krävs för HiveMQ Cloud)
+MQTT_USE_TLS=false                   # Sätt till true för krypterad anslutning
+MQTT_TLS_INSECURE=false             # Hoppa över certifikatverifiering (ej rekommenderat)
+MQTT_CLIENT_ID=                      # Valfritt client ID
+
 # Enhetskonfiguration
 DEVICE_ROOM=Konferensrum A           # Vilket rum enheten är i
 DEVICE_EMAIL=recordings@example.com  # E-post för notifikationer
 DEVICE_WEBHOOK_URL=https://...       # Webhook för anpassad hantering
 ```
+
+### HiveMQ Cloud Setup
+
+HiveMQ Cloud är en molnbaserad MQTT-broker som fungerar utmärkt med mötesinspelaren:
+
+1. **Skapa konto på HiveMQ Cloud**
+   - Gå till [https://www.hivemq.com/mqtt-cloud-broker/](https://www.hivemq.com/mqtt-cloud-broker/)
+   - Skapa ett gratis konto (upp till 100 anslutningar)
+
+2. **Skapa en cluster**
+   - Logga in på HiveMQ Cloud Console
+   - Skapa en ny cluster (välj region närmast dig)
+   - Anteckna Cluster URL (t.ex. `xxxxx.s1.eu.hivemq.cloud`)
+
+3. **Skapa användaruppgifter**
+   - Under "Access Management" → "Credentials"
+   - Skapa nytt användarnamn och lösenord
+   - Spara uppgifterna säkert
+
+4. **Konfigurera .env för HiveMQ Cloud**
+   ```bash
+   MQTT_ENABLED=true
+   MQTT_BROKER=xxxxx.s1.eu.hivemq.cloud  # Din cluster URL
+   MQTT_PORT=8883                          # HiveMQ Cloud använder TLS-port
+   MQTT_USERNAME=your_hivemq_username      # Från steg 3
+   MQTT_PASSWORD=your_hivemq_password      # Från steg 3
+   MQTT_TOPIC_PREFIX=meetrec/device1
+   MQTT_USE_TLS=true                       # MÅSTE vara true för HiveMQ Cloud
+   MQTT_TLS_INSECURE=false                # Använd säker certifikatverifiering
+   MQTT_CLIENT_ID=meetrec_device_001      # Valfritt men rekommenderat
+   ```
+
+5. **Testa anslutningen**
+   - Använd HiveMQ Cloud Web Client (finns i konsolen) för att testa
+   - Prenumerera på `meetrec/device1/#` för att se alla meddelanden
+   - Testa kommandon genom att publicera till `meetrec/device1/command`
+
 
 ### MQTT Topics
 

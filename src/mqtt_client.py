@@ -41,6 +41,9 @@ class MQTTClient:
         self.username = config.get("username")
         self.password = config.get("password")
         self.topic_prefix = config.get("topic_prefix", "meetrec/device")
+        self.use_tls = config.get("use_tls", False)
+        self.tls_insecure = config.get("tls_insecure", False)
+        self.client_id = config.get("client_id", None)
         
         # MQTT topics (sätts alltid, även om disabled)
         self.topic_command = f"{self.topic_prefix}/command"
@@ -62,11 +65,28 @@ class MQTTClient:
         if not self.enabled:
             return
         
-        # Client
-        self.client = mqtt.Client()
+        # Client (med custom client_id om angiven)
+        if self.client_id:
+            self.client = mqtt.Client(client_id=self.client_id)
+        else:
+            self.client = mqtt.Client()
+        
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
+        
+        # TLS/SSL för HiveMQ Cloud och andra säkra brokers
+        if self.use_tls:
+            import ssl
+            if self.tls_insecure:
+                # För testning eller self-signed certifikat
+                self.client.tls_set(cert_reqs=ssl.CERT_NONE)
+                self.client.tls_insecure_set(True)
+                logger.warning("MQTT TLS certificate verification är inaktiverad (insecure mode)")
+            else:
+                # Säker TLS med certifikatverifiering
+                self.client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+            logger.info("MQTT TLS/SSL aktiverad")
         
         if self.username and self.password:
             self.client.username_pw_set(self.username, self.password)
@@ -244,4 +264,7 @@ def get_mqtt_config_from_env() -> Dict[str, Any]:
         "username": os.getenv("MQTT_USERNAME"),
         "password": os.getenv("MQTT_PASSWORD"),
         "topic_prefix": os.getenv("MQTT_TOPIC_PREFIX", "meetrec/device"),
+        "use_tls": os.getenv("MQTT_USE_TLS", "false").lower() in ("true", "1", "yes"),
+        "tls_insecure": os.getenv("MQTT_TLS_INSECURE", "false").lower() in ("true", "1", "yes"),
+        "client_id": os.getenv("MQTT_CLIENT_ID"),
     }

@@ -201,11 +201,39 @@ MQTT_PASSWORD=secure_password_here
 
 ### TLS/SSL
 ```bash
-# Use encrypted connection
+# Use encrypted connection (required for HiveMQ Cloud)
+MQTT_USE_TLS=true
 MQTT_PORT=8883
 ```
 
+### HiveMQ Cloud Configuration
+
+HiveMQ Cloud is a managed MQTT broker that provides secure, scalable MQTT messaging:
+
+```bash
+# .env configuration for HiveMQ Cloud
+MQTT_ENABLED=true
+MQTT_BROKER=xxxxx.s1.eu.hivemq.cloud  # Your cluster URL from HiveMQ Console
+MQTT_PORT=8883                          # HiveMQ Cloud uses TLS port
+MQTT_USERNAME=your_username             # From HiveMQ Cloud credentials
+MQTT_PASSWORD=your_password             # From HiveMQ Cloud credentials
+MQTT_USE_TLS=true                       # Required for HiveMQ Cloud
+MQTT_TLS_INSECURE=false                # Use secure certificate verification
+MQTT_CLIENT_ID=meetrec_device_001      # Optional but recommended
+MQTT_TOPIC_PREFIX=meetrec/device1
+```
+
+**Benefits of HiveMQ Cloud:**
+- No broker installation or maintenance required
+- Free tier available (100 connections, 10 GB data transfer/month)
+- Built-in TLS/SSL security
+- Web-based MQTT client for testing
+- Global availability with multiple regions
+- Automatic scaling and high availability
+
 ### ACL (Access Control List) on Broker
+
+For self-hosted Mosquitto broker:
 
 ```
 # Allow device to publish status and subscribe to commands

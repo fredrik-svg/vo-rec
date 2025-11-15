@@ -6,16 +6,27 @@ Detta exempel visar:
 1. Hur man skickar kommandon till inspelaren
 2. Hur man lyssnar på status-uppdateringar
 3. Hur man uppdaterar konfiguration
+
+Fungerar med både lokala MQTT-brokers och HiveMQ Cloud.
 """
 import paho.mqtt.client as mqtt
 import json
 import time
 import sys
+import ssl
 
 # MQTT-konfiguration (ändra efter behov)
+# För lokal broker:
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
-MQTT_USERNAME = None  # Sätt om broker kräver autentisering
+MQTT_USE_TLS = False
+
+# För HiveMQ Cloud (kommentera ut ovan och använd dessa):
+# MQTT_BROKER = "xxxxx.s1.eu.hivemq.cloud"  # Din HiveMQ Cloud URL
+# MQTT_PORT = 8883
+# MQTT_USE_TLS = True
+
+MQTT_USERNAME = None  # Sätt om broker kräver autentisering (KRÄVS för HiveMQ Cloud)
 MQTT_PASSWORD = None
 DEVICE_TOPIC_PREFIX = "meetrec/device1"  # Ändra till din enhets topic prefix
 
@@ -71,6 +82,11 @@ def main():
     client.on_connect = on_connect
     client.on_message = on_message
     
+    # Konfigurera TLS för HiveMQ Cloud eller andra säkra brokers
+    if MQTT_USE_TLS:
+        client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+        print("✓ TLS/SSL aktiverad")
+    
     if MQTT_USERNAME and MQTT_PASSWORD:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     
@@ -82,6 +98,8 @@ def main():
         print(f"✗ Kunde inte ansluta till MQTT-broker: {e}")
         print(f"\nTips: Kontrollera att MQTT-brokern körs:")
         print(f"  - Lokal broker: sudo systemctl status mosquitto")
+        print(f"  - HiveMQ Cloud: kontrollera URL, port (8883), användarnamn/lösenord")
+        print(f"  - TLS: sätt MQTT_USE_TLS = True för HiveMQ Cloud")
         print(f"  - Test broker: använd MQTT_BROKER = 'test.mosquitto.org'")
         return 1
     
