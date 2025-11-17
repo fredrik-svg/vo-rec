@@ -69,8 +69,8 @@ python src/meetrec_gui.py
   - Använd **Volymkontroll (Gain)**-reglaget för att justera ingående ljudnivå (0.1x - 5.0x)
   - Standardvärde är 1.0x (ingen förstärkning)
 - **Starta inspelning** skapar WAV (mono, 16 kHz), visar stor röd **REC** + timer.
-- **Stoppa & ladda upp** konverterar till FLAC och laddar upp till Drive.
-- Statusfältet visar resultat och en länk (webViewLink) om allt gick bra.
+- **Stoppa & ladda upp** konverterar till FLAC och laddar upp till vald destination.
+- Statusfältet visar resultat och status för uppladdningen.
 
 ## 5) Autostart (kiosk)
 ### Alternativ A: Desktop autostart
