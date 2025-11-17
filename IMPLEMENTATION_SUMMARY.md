@@ -16,7 +16,7 @@ This implementation adds MQTT-based remote control and configuration management 
 - **Email address** - Email to use when sending recordings
 - **Webhook URL** - Custom webhook for notifications/processing
 - **WiFi settings** - Secure storage of WiFi credentials
-- **Upload target** - Configure upload destination (Google Drive, S3, HTTP, n8n)
+- **Upload target** - Configure upload destination (S3, HTTP, n8n)
 
 ## Implementation Details
 

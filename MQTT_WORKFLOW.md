@@ -124,7 +124,7 @@ meetrec/device1/config
 | `room` | string | Room identifier |
 | `email` | string | Email for notifications |
 | `webhook_url` | string | Custom webhook URL |
-| `upload_target` | string | Upload destination (gdrive, s3, http, n8n) |
+| `upload_target` | string | Upload destination (s3, http, n8n) |
 | `n8n_webhook_url` | string | n8n workflow webhook |
 | `wifi_ssid` | string | WiFi network name |
 | `wifi_password` | string | WiFi password (stored securely) |

@@ -47,7 +47,7 @@ class ConfigManager:
             "room": os.getenv("DEVICE_ROOM", ""),
             "email": os.getenv("DEVICE_EMAIL", ""),
             "webhook_url": os.getenv("DEVICE_WEBHOOK_URL", ""),
-            "upload_target": os.getenv("UPLOAD_TARGET", "gdrive"),
+            "upload_target": os.getenv("UPLOAD_TARGET", "n8n"),
             "n8n_webhook_url": os.getenv("N8N_WEBHOOK_URL", ""),
         }
         
