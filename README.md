@@ -117,7 +117,13 @@ MQTT_BROKER=mqtt.example.com        # Din MQTT-broker
 MQTT_PORT=1883                       # Port (1883 standard, 8883 för TLS)
 MQTT_USERNAME=your_username          # Valfritt
 MQTT_PASSWORD=your_password          # Valfritt
-MQTT_TOPIC_PREFIX=meetrec/device1    # Unikt för varje enhet
+MQTT_TOPIC_PREFIX=meetrec/device1    # Unikt för varje enhet (normaliseras automatiskt)
+
+**Notera:** Topic prefix normaliseras automatiskt för att undvika vanliga problem:
+- Ledande och avslutande snedstreck tas bort
+- Dubbla snedstreck ersätts med enkla
+- Mellanslag tas bort
+- Detta säkerställer kompatibilitet med HiveMQ Cloud och andra MQTT-brokers
 
 # TLS/SSL (krävs för HiveMQ Cloud)
 MQTT_USE_TLS=false                   # Sätt till true för krypterad anslutning

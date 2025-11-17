@@ -25,6 +25,51 @@ logger = logging.getLogger(__name__)
 class MQTTClient:
     """MQTT-klient för fjärrstyrning av mötesinspelaren"""
     
+    @staticmethod
+    def normalize_topic_prefix(prefix: str) -> str:
+        """
+        Normalisera MQTT topic prefix för att undvika vanliga problem.
+        
+        Åtgärdar:
+        - Tar bort ledande snedstreck (/)
+        - Tar bort avslutande snedstreck (/)
+        - Ersätter flera snedstreck i rad med ett enda
+        - Tar bort mellanslag
+        
+        Args:
+            prefix: Topic prefix att normalisera
+            
+        Returns:
+            Normaliserad topic prefix
+            
+        Exempel:
+            >>> MQTTClient.normalize_topic_prefix("/meetrec/device1/")
+            'meetrec/device1'
+            >>> MQTTClient.normalize_topic_prefix("meetrec//device1")
+            'meetrec/device1'
+        """
+        if not prefix:
+            return "meetrec/device"
+        
+        # Tar bort mellanslag
+        normalized = prefix.replace(" ", "")
+        
+        # Ersätt flera snedstreck med ett enda
+        while "//" in normalized:
+            normalized = normalized.replace("//", "/")
+        
+        # Ta bort ledande snedstreck
+        normalized = normalized.lstrip("/")
+        
+        # Ta bort avslutande snedstreck
+        normalized = normalized.rstrip("/")
+        
+        # Om prefix är tomt efter normalisering, använd standard
+        if not normalized:
+            return "meetrec/device"
+            
+        return normalized
+    
     def __init__(self, config: Dict[str, Any]):
         """
         Initiera MQTT-klient med konfiguration.
@@ -40,12 +85,20 @@ class MQTTClient:
         self.port = int(config.get("port", 1883))
         self.username = config.get("username")
         self.password = config.get("password")
-        self.topic_prefix = config.get("topic_prefix", "meetrec/device")
+        
+        # Normalisera topic prefix för att undvika vanliga problem
+        raw_prefix = config.get("topic_prefix", "meetrec/device")
+        self.topic_prefix = self.normalize_topic_prefix(raw_prefix)
+        
+        # Logga om prefix ändrades under normalisering
+        if raw_prefix != self.topic_prefix:
+            logger.info(f"Topic prefix normaliserad: '{raw_prefix}' -> '{self.topic_prefix}'")
+        
         self.use_tls = config.get("use_tls", False)
         self.tls_insecure = config.get("tls_insecure", False)
         self.client_id = config.get("client_id", None)
         
-        # MQTT topics (sätts alltid, även om disabled)
+        # MQTT topics (genereras från normaliserad prefix)
         self.topic_command = f"{self.topic_prefix}/command"
         self.topic_status = f"{self.topic_prefix}/status"
         self.topic_config = f"{self.topic_prefix}/config"
