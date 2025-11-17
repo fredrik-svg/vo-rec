@@ -32,7 +32,7 @@ ALSA_DEVICE   = None          # None => standard. Eller t.ex. "hw:1,0" för ReSp
 MAX_HOURS     = 8
 
 # Uppladdning (miljövariabler)
-UPLOAD_TARGET = os.getenv("UPLOAD_TARGET", "gdrive").lower()
+UPLOAD_TARGET = os.getenv("UPLOAD_TARGET", "n8n").lower()
 AWS_REGION    = os.getenv("AWS_REGION", "eu-north-1")
 S3_BUCKET     = os.getenv("S3_BUCKET")
 S3_ENDPOINT   = os.getenv("S3_ENDPOINT_URL")
@@ -40,57 +40,6 @@ HTTP_UPLOAD_URL   = os.getenv("HTTP_UPLOAD_URL")
 HTTP_AUTH_HEADER  = os.getenv("HTTP_AUTH_HEADER")
 N8N_WEBHOOK_URL   = os.getenv("N8N_WEBHOOK_URL")
 N8N_AUTH_HEADER   = os.getenv("N8N_AUTH_HEADER")
-
-# ---- Google Drive ----
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from google.oauth2.service_account import Credentials as SACredentials
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials as OAuthCredentials
-
-DRIVE_AUTH_TYPE = os.getenv("DRIVE_AUTH_TYPE", "service_account").lower()  # "service_account" | "oauth"
-DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID", "")
-DRIVE_SERVICE_ACCOUNT_JSON = os.getenv("DRIVE_SERVICE_ACCOUNT_JSON")  # path till SA.json
-DRIVE_CLIENT_SECRETS = os.getenv("DRIVE_CLIENT_SECRETS")              # path till OAuth client_secret.json
-DRIVE_TOKEN_PATH = os.getenv("DRIVE_TOKEN_PATH", str(Path.home()/ "meetrec" / "token.json"))
-DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
-_drive_service = None   # cachead klient
-
-def get_drive_service():
-    global _drive_service
-    if _drive_service:
-        return _drive_service
-
-    if DRIVE_AUTH_TYPE == "service_account":
-        if not DRIVE_SERVICE_ACCOUNT_JSON or not Path(DRIVE_SERVICE_ACCOUNT_JSON).exists():
-            raise RuntimeError("Saknar service account JSON (DRIVE_SERVICE_ACCOUNT_JSON).")
-        creds = SACredentials.from_service_account_file(
-            DRIVE_SERVICE_ACCOUNT_JSON, scopes=DRIVE_SCOPES
-        )
-        _drive_service = build("drive", "v3", credentials=creds)
-        return _drive_service
-
-    elif DRIVE_AUTH_TYPE == "oauth":
-        creds = None
-        if Path(DRIVE_TOKEN_PATH).exists():
-            creds = OAuthCredentials.from_authorized_user_file(DRIVE_TOKEN_PATH, DRIVE_SCOPES)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                from google_auth_oauthlib.flow import InstalledAppFlow
-                if not DRIVE_CLIENT_SECRETS or not Path(DRIVE_CLIENT_SECRETS).exists():
-                    raise RuntimeError("Saknar CLIENT_SECRETS (DRIVE_CLIENT_SECRETS).")
-                flow = InstalledAppFlow.from_client_secrets_file(DRIVE_CLIENT_SECRETS, DRIVE_SCOPES)
-                creds = flow.run_console()  # visar URL i terminalen
-            Path(DRIVE_TOKEN_PATH).parent.mkdir(parents=True, exist_ok=True)
-            with open(DRIVE_TOKEN_PATH, "w") as f:
-                f.write(creds.to_json())
-        _drive_service = build("drive", "v3", credentials=creds)
-        return _drive_service
-
-    else:
-        raise RuntimeError(f"Okänt DRIVE_AUTH_TYPE: {DRIVE_AUTH_TYPE}")
 
 # ========= Hjälp =========
 def ts_name():
@@ -167,23 +116,6 @@ def upload_file(flac_path: Path):
                 return False, f"n8n webhook {r.status_code}: {r.text[:200]}"
         except Exception as e:
             return False, f"n8n-fel: {e}"
-
-    elif UPLOAD_TARGET == "gdrive":
-        try:
-            if not DRIVE_FOLDER_ID:
-                return False, "DRIVE_FOLDER_ID saknas"
-            service = get_drive_service()
-            media = MediaFileUpload(str(flac_path), mimetype="audio/flac", resumable=False)
-            file_metadata = {"name": flac_path.name, "parents": [DRIVE_FOLDER_ID]}
-            file = service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields="id, name, webViewLink, webContentLink",
-            ).execute()
-            link = file.get("webViewLink") or file.get("webContentLink") or f"gdrive:file:{file.get('id')}"
-            return True, f"{file.get('name')} → {link}"
-        except Exception as e:
-            return False, f"GDrive-fel: {e}"
     else:
         return False, f"Okänt UPLOAD_TARGET: {UPLOAD_TARGET}"
 
