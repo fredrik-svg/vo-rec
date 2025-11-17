@@ -8,6 +8,9 @@ Detta exempel visar:
 3. Hur man uppdaterar konfiguration
 
 Fungerar med både lokala MQTT-brokers och HiveMQ Cloud.
+
+OBS: Topic prefix normaliseras automatiskt i mötesinspelaren, så du kan
+använda vilket prefix som helst här - det kommer att matcha automatiskt.
 """
 import paho.mqtt.client as mqtt
 import json

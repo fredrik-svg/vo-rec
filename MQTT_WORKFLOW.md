@@ -11,6 +11,15 @@ meetrec/device1/
 └── recording         (publish)   - Recording completion info
 ```
 
+**Topic Normalisering:**
+Topics normaliseras automatiskt för att säkerställa kompatibilitet med alla MQTT-brokers:
+- Ledande snedstreck (`/`) tas bort
+- Avslutande snedstreck (`/`) tas bort
+- Dubbla snedstreck (`//`) ersätts med enkla (`/`)
+- Mellanslag tas bort
+
+Detta säkerställer att topics alltid är välformade och fungerar korrekt med HiveMQ Cloud och andra MQTT-brokers.
+
 ## Command Flow
 
 ### Starting a Recording

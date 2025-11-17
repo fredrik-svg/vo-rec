@@ -1,16 +1,26 @@
 # HiveMQ Cloud Support - Changes Summary
 
 ## Overview
-Added full support for HiveMQ Cloud, a managed MQTT broker service that requires TLS/SSL encryption and provides enterprise-grade MQTT infrastructure.
+Added full support for HiveMQ Cloud, a managed MQTT broker service that requires TLS/SSL encryption and provides enterprise-grade MQTT infrastructure. Recent improvements include robust topic handling that prevents common configuration issues.
 
 ## Changes Made
 
 ### 1. MQTT Client (`src/mqtt_client.py`)
 
-**New Configuration Parameters:**
+**Topic Normalization (NEW):**
+- `normalize_topic_prefix()` - Automatically sanitizes topic prefixes
+  - Removes leading/trailing slashes
+  - Replaces multiple slashes with single slashes
+  - Removes spaces
+  - Falls back to default for empty/invalid input
+- Ensures all topics are MQTT-compliant and work with HiveMQ Cloud
+- Logs when normalization occurs for debugging
+
+**Configuration Parameters:**
 - `use_tls` (bool) - Enable TLS/SSL encryption
 - `tls_insecure` (bool) - Skip certificate verification (for testing/self-signed certs)
 - `client_id` (str) - Custom client identifier
+- `topic_prefix` (str) - Topic prefix (automatically normalized)
 
 **Implementation:**
 ```python
@@ -105,12 +115,15 @@ MQTT_USE_TLS = True
 4. **Reliability**: High availability and global presence
 5. **Free Tier**: Perfect for small deployments and testing
 6. **Web Testing**: Built-in MQTT client for debugging
+7. **Topic Compatibility**: Automatic topic normalization prevents configuration issues
 
 ## Testing
 
 Verified:
 - ✅ TLS configuration parsing
 - ✅ Client ID handling
+- ✅ Topic prefix normalization (11 test cases)
+- ✅ Malformed topic prevention
 - ✅ Backward compatibility (works without TLS)
 - ✅ All existing tests pass
 - ✅ CodeQL security scan: 0 vulnerabilities
@@ -150,6 +163,12 @@ MQTT_PASSWORD=your_password
 - Ensure `MQTT_USE_TLS=true`
 - Check broker URL is correct
 - Verify port is 8883 (not 1883)
+
+**Topics not working / messages not received:**
+- Topics are automatically normalized - check logs for normalization messages
+- Avoid using leading slashes (`/meetrec/...`) - use `meetrec/...` instead
+- Avoid trailing slashes (`meetrec/device1/`) - use `meetrec/device1` instead
+- The system will fix these automatically, but check logs to confirm
 
 **Certificate verification errors:**
 - For production: Ensure system CA certificates are up to date
