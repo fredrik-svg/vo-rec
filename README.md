@@ -5,8 +5,8 @@ Enkel touch-baserad inspelare för Raspberry Pi + ReSpeaker (eller annan USB-mik
 - Visar nivåmätare i testläge (per kanal)
 - Har **stor röd REC-indikator** + **centrerad timer** under inspelning
 - Konverterar WAV → FLAC med ffmpeg
-- Laddar upp filen till vald destination (S3/HTTP/n8n)
-- (Valfritt) Stöd finns för S3/HTTP/n8n för filuppladdning
+- Laddar upp filen till **Google Drive** (Service Account eller OAuth)
+- (Valfritt) Stöd finns kvar för S3/HTTP/n8n/MQTT om du vill växla senare
 
 ## 1) Förkrav (OS-paket)
 ```bash
@@ -53,6 +53,43 @@ Kopiera `.env.example` → `.env` och fyll i värden.
    - Spara filen till en molntjänst
    - Skicka notifikationer
    - Extrahera insikter och metadata
+
+### Konfiguration av MQTT / HiveMQ Cloud (alternativ uppladdning)
+
+**MQTT** är ett lättviktigt meddelandeprotokoll som är perfekt för IoT-enheter som Raspberry Pi. **HiveMQ Cloud** är en fullständigt hanterad MQTT-broker i molnet:
+
+1. **Skapa ett HiveMQ Cloud-konto**
+   - Gå till [HiveMQ Cloud](https://www.hivemq.com/mqtt-cloud-broker/)
+   - Skapa ett gratis konto och ett nytt cluster
+   - Anteckna cluster-URL:en (t.ex. `xxxxxxxx.s1.eu.hivemq.cloud`)
+
+2. **Skapa MQTT-autentiseringsuppgifter**
+   - I HiveMQ Cloud Console, gå till "Access Management"
+   - Skapa en ny användare med användarnamn och lösenord
+   - Ge användaren publiceringsrättigheter för ditt topic
+
+3. **Konfigurera .env**:
+   ```bash
+   UPLOAD_TARGET="mqtt"
+   MQTT_BROKER="xxxxxxxx.s1.eu.hivemq.cloud"
+   MQTT_PORT=8883
+   MQTT_USERNAME="din-mqtt-användare"
+   MQTT_PASSWORD="ditt-mqtt-lösenord"
+   MQTT_TOPIC="recordings/meetings"
+   MQTT_USE_TLS=true
+   ```
+
+4. **MQTT-meddelanden**
+   - Inspelningar publiceras som JSON-meddelanden till det konfigurerade topic
+   - Meddelandet innehåller filnamn, timestamp, storlek och filen kodad i base64
+   - Du kan prenumerera på topic:et från andra system för att ta emot och bearbeta inspelningar
+
+5. **Prenumerera på meddelanden** (exempel med mosquitto_sub):
+   ```bash
+   mosquitto_sub -h xxxxxxxx.s1.eu.hivemq.cloud -p 8883 \
+     -u "din-mqtt-användare" -P "ditt-mqtt-lösenord" \
+     -t "recordings/meetings" --capath /etc/ssl/certs/
+   ```
 
 Läs in env i din shell-session:
 ```bash
