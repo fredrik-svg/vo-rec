@@ -1,4 +1,4 @@
-# meetrec-pi — Raspberry Pi mötesinspelare (Touch GUI) med Google Drive-upload
+# meetrec-pi — Raspberry Pi mötesinspelare (Touch GUI) med n8n-upload
 
 Enkel touch-baserad inspelare för Raspberry Pi + ReSpeaker (eller annan USB-mik) som:
 - Startar och stoppar inspelning via en touchskärm (Tkinter-GUI)
@@ -27,137 +27,9 @@ pip install -r requirements.txt
 ```
 
 ## 3) Konfiguration (.env)
-Kopiera `.env.example` → `.env` och fyll i värden. Minsta nödvändiga för **Google Drive**:
+Kopiera `.env.example` → `.env` och fyll i värden.
 
-```bash
-UPLOAD_TARGET="gdrive"
-DRIVE_FOLDER_ID="xxxx_xxxxxxxxxxxxxxxxx"  # Mappens ID i Drive (syns i URL)
-# Välj ETT auth-sätt:
-
-# (A) Service Account (rekommenderas på Pi utan användare)
-DRIVE_AUTH_TYPE="service_account"
-DRIVE_SERVICE_ACCOUNT_JSON="/home/pi/meetrec/sa.json"  # sökväg till din SA-nyckel
-
-# (B) OAuth (engångs-inloggning via terminal)
-#DRIVE_AUTH_TYPE="oauth"
-#DRIVE_CLIENT_SECRETS="/home/pi/meetrec/client_secret.json"
-#DRIVE_TOKEN_PATH="/home/pi/meetrec/token.json"
-```
-
-### Konfiguration av Service Account (rekommenderat för oövervakad drift)
-
-**Service Account** är det enklaste alternativet för Raspberry Pi som kör utan användarinteraktion:
-
-1. **Aktivera Drive API** i Google Cloud Console
-2. **Skapa Service Account** + JSON-nyckel
-3. **Dela Drive-mappen** med Service Account-e-postadressen (finns i JSON-filen)
-
-### Konfiguration av OAuth (för användarbaserad autentisering)
-
-**OAuth** kräver engångs-inloggning men ger åtkomst till din egen Google Drive. Följ dessa steg noggrant:
-
-#### Steg 1: Skapa eller välj ett Google Cloud-projekt
-
-1. Gå till [Google Cloud Console](https://console.cloud.google.com/)
-2. Skapa ett nytt projekt eller välj ett befintligt projekt
-   - Klicka på projektväljaren högst upp
-   - Klicka på "Nytt projekt" (New Project)
-   - Ge projektet ett namn (t.ex. "MeetRec Pi")
-   - Klicka "Skapa" (Create)
-
-#### Steg 2: Aktivera Google Drive API
-
-1. I Google Cloud Console, gå till "API:er och tjänster" → "Bibliotek" (APIs & Services → Library)
-2. Sök efter "Google Drive API"
-3. Klicka på "Google Drive API" i resultaten
-4. Klicka på knappen "Aktivera" (Enable)
-5. Vänta tills API:et är aktiverat (kan ta några sekunder)
-
-#### Steg 3: Konfigurera OAuth-medgivandeskärm (Consent Screen)
-
-1. Gå till "API:er och tjänster" → "OAuth-medgivandeskärm" (OAuth consent screen)
-2. Välj användartyp:
-   - **Extern** (External): Om du vill använda ditt personliga Google-konto
-   - **Internt** (Internal): Endast om du har Google Workspace och vill begränsa till din organisation
-3. Klicka "Skapa" (Create)
-4. Fyll i grundläggande information:
-   - **Appnamn**: t.ex. "MeetRec Pi Recorder"
-   - **E-post för användarsupport**: din e-postadress
-   - **E-post för utvecklarkontakt**: din e-postadress
-5. Klicka "Spara och fortsätt" (Save and Continue)
-6. På sidan "Omfång" (Scopes):
-   - Du behöver inte lägga till några omfång här (hanteras av applikationen)
-   - Klicka "Spara och fortsätt"
-7. På sidan "Testanvändare" (Test users):
-   - Klicka "Lägg till användare" (Add Users)
-   - Lägg till din egen e-postadress (det Google-konto du vill använda)
-   - Klicka "Spara och fortsätt"
-8. Granska sammanfattningen och klicka "Tillbaka till instrumentpanelen" (Back to Dashboard)
-
-#### Steg 4: Skapa OAuth 2.0-klientinformation
-
-1. Gå till "API:er och tjänster" → "Autentiseringsuppgifter" (Credentials)
-2. Klicka på "+ Skapa autentiseringsuppgifter" (Create Credentials) högst upp
-3. Välj "OAuth-klient-ID" (OAuth client ID)
-4. Välj programtyp: **Datorprogram** (Desktop app)
-5. Ge den ett namn, t.ex. "MeetRec Desktop Client"
-6. Klicka "Skapa" (Create)
-7. En dialogruta visas med klient-ID och klienthemlighet
-   - Klicka "Ladda ned JSON" (Download JSON)
-   - Spara filen som `client_secret.json`
-
-#### Steg 5: Placera client_secret.json på din Raspberry Pi
-
-1. Kopiera `client_secret.json` till din Raspberry Pi:
-   ```bash
-   # Från din dator (om du använder scp):
-   scp client_secret.json pi@<pi-ip-adress>:~/meetrec/client_secret.json
-   
-   # Eller kopiera manuellt via USB-sticka eller annan metod
-   ```
-
-2. Se till att sökvägen i `.env` matchar:
-   ```bash
-   DRIVE_CLIENT_SECRETS="/home/pi/meetrec/client_secret.json"
-   DRIVE_TOKEN_PATH="/home/pi/meetrec/token.json"
-   ```
-
-#### Steg 6: Genomför första autentiseringen
-
-1. Första gången du kör applikationen med OAuth-konfiguration kommer en autentiseringsprocess att startas:
-   ```bash
-   source ~/meetrec/bin/activate
-   python src/meetrec_gui.py
-   ```
-
-2. Terminalen visar en URL som ser ut ungefär så här:
-   ```
-   Please visit this URL to authorize this application:
-   https://accounts.google.com/o/oauth2/auth?client_id=...
-   ```
-
-3. **Öppna URL:en i en webbläsare** (kan göras på vilken enhet som helst):
-   - Logga in med det Google-konto du lade till som testanvändare
-   - Google visar en varning om att appen inte är verifierad:
-     - Klicka "Avancerat" (Advanced)
-     - Klicka "Gå till [Appnamn] (osäkert)" (Go to [App name] (unsafe))
-   - Godkänn åtkomst till Google Drive
-   - Du får en auktoriseringskod som visas i webbläsaren
-
-4. **Kopiera auktoriseringskoden** och klistra in den i terminalen där applikationen väntar
-
-5. Token sparas automatiskt i filen som anges av `DRIVE_TOKEN_PATH`
-
-6. Framtida körningar använder den sparade token och kräver ingen ny inloggning (såvida inte token upphör eller återkallas)
-
-#### Felsökning OAuth
-
-- **"Appen har blockerats"**: Se till att du har lagt till ditt Google-konto som testanvändare i steg 3.7
-- **Token har upphört**: Ta bort `token.json` och kör autentiseringsprocessen igen
-- **Felaktig client_secret.json**: Kontrollera att filen är korrekt nedladdad och inte är tom eller korrupt
-- **Nätverksfel**: Se till att Raspberry Pi har internetåtkomst för att nå Google-servrar
-
-### Konfiguration av n8n workflow (alternativ uppladdning)
+### Konfiguration av n8n workflow (rekommenderad uppladdning)
 
 **n8n** är ett workflow automation-verktyg som kan ta emot filer via webhooks. Detta är ett enkelt sätt att automatiskt bearbeta inspelningar:
 
@@ -234,8 +106,8 @@ python src/meetrec_gui.py
   - Använd **Volymkontroll (Gain)**-reglaget för att justera ingående ljudnivå (0.1x - 5.0x)
   - Standardvärde är 1.0x (ingen förstärkning)
 - **Starta inspelning** skapar WAV (mono, 16 kHz), visar stor röd **REC** + timer.
-- **Stoppa & ladda upp** konverterar till FLAC och laddar upp till Drive.
-- Statusfältet visar resultat och en länk (webViewLink) om allt gick bra.
+- **Stoppa & ladda upp** konverterar till FLAC och laddar upp till vald destination.
+- Statusfältet visar resultat och status för uppladdningen.
 
 ## 5) Autostart (kiosk)
 ### Alternativ A: Desktop autostart
@@ -261,7 +133,173 @@ git remote add origin git@github.com:<ditt-konto>/<ditt-repo>.git
 git push -u origin main
 ```
 
-## 7) Vanliga justeringar
+## 7) MQTT-fjärrstyrning och konfiguration
+
+Mötesinspelaren stöder MQTT-baserad fjärrstyrning och konfigurationshantering. Detta gör det möjligt att:
+- Starta/stoppa inspelningar på distans
+- Övervaka enhetens status
+- Konfigurera parametrar som webhook, rum och e-post
+- Hantera WiFi-inställningar
+
+### Aktivera MQTT
+
+Lägg till följande i `.env`:
+
+```bash
+# Aktivera MQTT-kontroll
+MQTT_ENABLED=true
+
+# MQTT Broker-inställningar
+MQTT_BROKER=mqtt.example.com        # Din MQTT-broker
+MQTT_PORT=1883                       # Port (1883 standard, 8883 för TLS)
+MQTT_USERNAME=your_username          # Valfritt
+MQTT_PASSWORD=your_password          # Valfritt
+MQTT_TOPIC_PREFIX=meetrec/device1    # Unikt för varje enhet (normaliseras automatiskt)
+
+**Notera:** Topic prefix normaliseras automatiskt för att undvika vanliga problem:
+- Ledande och avslutande snedstreck tas bort
+- Dubbla snedstreck ersätts med enkla
+- Mellanslag tas bort
+- Detta säkerställer kompatibilitet med HiveMQ Cloud och andra MQTT-brokers
+
+# TLS/SSL (krävs för HiveMQ Cloud)
+MQTT_USE_TLS=false                   # Sätt till true för krypterad anslutning
+MQTT_TLS_INSECURE=false             # Hoppa över certifikatverifiering (ej rekommenderat)
+MQTT_CLIENT_ID=                      # Valfritt client ID
+
+# Enhetskonfiguration
+DEVICE_ROOM=Konferensrum A           # Vilket rum enheten är i
+DEVICE_EMAIL=recordings@example.com  # E-post för notifikationer
+DEVICE_WEBHOOK_URL=https://...       # Webhook för anpassad hantering
+```
+
+### HiveMQ Cloud Setup
+
+HiveMQ Cloud är en molnbaserad MQTT-broker som fungerar utmärkt med mötesinspelaren:
+
+1. **Skapa konto på HiveMQ Cloud**
+   - Gå till [https://www.hivemq.com/mqtt-cloud-broker/](https://www.hivemq.com/mqtt-cloud-broker/)
+   - Skapa ett gratis konto (upp till 100 anslutningar)
+
+2. **Skapa en cluster**
+   - Logga in på HiveMQ Cloud Console
+   - Skapa en ny cluster (välj region närmast dig)
+   - Anteckna Cluster URL (t.ex. `xxxxx.s1.eu.hivemq.cloud`)
+
+3. **Skapa användaruppgifter**
+   - Under "Access Management" → "Credentials"
+   - Skapa nytt användarnamn och lösenord
+   - Spara uppgifterna säkert
+
+4. **Konfigurera .env för HiveMQ Cloud**
+   ```bash
+   MQTT_ENABLED=true
+   MQTT_BROKER=xxxxx.s1.eu.hivemq.cloud  # Din cluster URL
+   MQTT_PORT=8883                          # HiveMQ Cloud använder TLS-port
+   MQTT_USERNAME=your_hivemq_username      # Från steg 3
+   MQTT_PASSWORD=your_hivemq_password      # Från steg 3
+   MQTT_TOPIC_PREFIX=meetrec/device1
+   MQTT_USE_TLS=true                       # MÅSTE vara true för HiveMQ Cloud
+   MQTT_TLS_INSECURE=false                # Använd säker certifikatverifiering
+   MQTT_CLIENT_ID=meetrec_device_001      # Valfritt men rekommenderat
+   ```
+
+5. **Testa anslutningen**
+   - Använd HiveMQ Cloud Web Client (finns i konsolen) för att testa
+   - Prenumerera på `meetrec/device1/#` för att se alla meddelanden
+   - Testa kommandon genom att publicera till `meetrec/device1/command`
+
+
+### MQTT Topics
+
+Enheten använder följande topics (med prefix `meetrec/device1` som exempel):
+
+**Kommandon (subscribe):**
+- `meetrec/device1/command` - Skicka kommandon till enheten
+  - `start` - Starta inspelning
+  - `stop` - Stoppa inspelning och ladda upp
+  - `test` - Starta/stoppa nivåtest
+
+**Status (publish):**
+- `meetrec/device1/status` - Enhetens aktuella status
+  - `ready` - Redo för inspelning
+  - `recording` - Inspelning pågår
+  - `processing` - Konverterar inspelning
+  - `converting` - Konverterar WAV→FLAC
+  - `uploading` - Laddar upp
+  - `error` - Fel uppstod
+
+**Konfiguration:**
+- `meetrec/device1/config` - Nuvarande konfiguration (publish)
+- `meetrec/device1/config/set` - Uppdatera konfiguration (subscribe)
+
+**Inspelningar:**
+- `meetrec/device1/recording` - Information om färdiga inspelningar
+
+### Konfigurera enheten via MQTT
+
+Skicka ett JSON-meddelande till `meetrec/device1/config/set`:
+
+```json
+{
+  "room": "Konferensrum B",
+  "email": "ny-adress@example.com",
+  "webhook_url": "https://webhook.site/your-id",
+  "upload_target": "n8n",
+  "n8n_webhook_url": "https://n8n.example.com/webhook/abc123"
+}
+```
+
+**WiFi-konfiguration:**
+```json
+{
+  "wifi_ssid": "DittWiFi",
+  "wifi_password": "dittlösenord"
+}
+```
+
+### Exempel med mosquitto_pub
+
+```bash
+# Starta inspelning
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "start"
+
+# Stoppa inspelning
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "stop"
+
+# Uppdatera rum
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/config/set" -m '{"room":"Konferensrum C"}'
+
+# Lyssna på status
+mosquitto_sub -h mqtt.example.com -t "meetrec/device1/#"
+```
+
+### Home Assistant integration
+
+Exempel på Home Assistant-konfiguration för att styra inspelaren:
+
+```yaml
+mqtt:
+  button:
+    - name: "Meetrec Start Recording"
+      command_topic: "meetrec/device1/command"
+      payload_press: "start"
+    
+    - name: "Meetrec Stop Recording"
+      command_topic: "meetrec/device1/command"
+      payload_press: "stop"
+  
+  sensor:
+    - name: "Meetrec Status"
+      state_topic: "meetrec/device1/status"
+      value_template: "{{ value_json.status }}"
+    
+    - name: "Meetrec Room"
+      state_topic: "meetrec/device1/config"
+      value_template: "{{ value_json.room }}"
+```
+
+## 8) Vanliga justeringar
 - **Välj ljudenhet**: sätt `ALSA_DEVICE = "hw:1,0"` i koden om flera ljudkort finns. Hitta ID med `arecord -l`.
 - **Kanalantal i testläget**: justera `CHANNELS_TEST` (t.ex. 4 eller 6 för ReSpeaker v2.0).
   - Systemet öppnar automatiskt alla tillgängliga kanaler från enheten för att fånga alla mikrofoner

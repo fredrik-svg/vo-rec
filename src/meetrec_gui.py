@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, time, subprocess, threading, queue
+import os, sys, time, subprocess, threading, queue, logging
 from pathlib import Path
 from datetime import datetime
 
@@ -8,6 +8,18 @@ from tkinter import ttk
 
 import numpy as np
 import sounddevice as sd
+
+# Import MQTT och konfigurationshantering
+try:
+    from mqtt_client import MQTTClient, get_mqtt_config_from_env
+    from config_manager import ConfigManager
+    MQTT_SUPPORT = True
+except ImportError as e:
+    MQTT_SUPPORT = False
+    logging.warning(f"MQTT-stöd ej tillgängligt: {e}")
+
+# Konfigurera logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # ========= Konfig =========
 AUDIO_DIR     = Path.home() / "meet_recordings"
@@ -20,7 +32,7 @@ ALSA_DEVICE   = None          # None => standard. Eller t.ex. "hw:1,0" för ReSp
 MAX_HOURS     = 8
 
 # Uppladdning (miljövariabler)
-UPLOAD_TARGET = os.getenv("UPLOAD_TARGET", "gdrive").lower()
+UPLOAD_TARGET = os.getenv("UPLOAD_TARGET", "n8n").lower()
 AWS_REGION    = os.getenv("AWS_REGION", "eu-north-1")
 S3_BUCKET     = os.getenv("S3_BUCKET")
 S3_ENDPOINT   = os.getenv("S3_ENDPOINT_URL")
@@ -163,76 +175,6 @@ def upload_file(flac_path: Path):
                 return False, f"n8n webhook {r.status_code}: {r.text[:200]}"
         except Exception as e:
             return False, f"n8n-fel: {e}"
-
-    elif UPLOAD_TARGET == "gdrive":
-        try:
-            if not DRIVE_FOLDER_ID:
-                return False, "DRIVE_FOLDER_ID saknas"
-            service = get_drive_service()
-            media = MediaFileUpload(str(flac_path), mimetype="audio/flac", resumable=False)
-            file_metadata = {"name": flac_path.name, "parents": [DRIVE_FOLDER_ID]}
-            file = service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields="id, name, webViewLink, webContentLink",
-            ).execute()
-            link = file.get("webViewLink") or file.get("webContentLink") or f"gdrive:file:{file.get('id')}"
-            return True, f"{file.get('name')} → {link}"
-        except Exception as e:
-            return False, f"GDrive-fel: {e}"
-    
-    elif UPLOAD_TARGET == "mqtt":
-        try:
-            if not MQTT_BROKER:
-                return False, "MQTT_BROKER saknas"
-            if not MQTT_USERNAME or not MQTT_PASSWORD:
-                return False, "MQTT_USERNAME eller MQTT_PASSWORD saknas"
-            
-            import paho.mqtt.client as mqtt
-            import json
-            import base64
-            
-            # Läs filen och konvertera till base64
-            with open(flac_path, "rb") as f:
-                file_data = f.read()
-            file_base64 = base64.b64encode(file_data).decode('utf-8')
-            
-            # Skapa MQTT-meddelande med filmetadata
-            message = {
-                "filename": flac_path.name,
-                "timestamp": datetime.now().isoformat(),
-                "size": len(file_data),
-                "mimetype": "audio/flac",
-                "data": file_base64
-            }
-            
-            # Skapa MQTT-klient
-            client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"meetrec_{ts_name()}", protocol=mqtt.MQTTv311)
-            client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-            
-            # Konfigurera TLS för HiveMQ Cloud
-            if MQTT_USE_TLS:
-                import ssl
-                client.tls_set(cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1_2)
-            
-            # Anslut till broker
-            client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-            
-            # Publicera meddelandet
-            result = client.publish(MQTT_TOPIC, json.dumps(message), qos=1)
-            
-            # Vänta på att meddelandet ska skickas
-            result.wait_for_publish(timeout=30)
-            
-            # Koppla från
-            client.disconnect()
-            
-            if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                return True, f"MQTT: {flac_path.name} publicerad till {MQTT_TOPIC}"
-            else:
-                return False, f"MQTT-fel: Publish misslyckades med kod {result.rc}"
-        except Exception as e:
-            return False, f"MQTT-fel: {e}"
     else:
         return False, f"Okänt UPLOAD_TARGET: {UPLOAD_TARGET}"
 
@@ -480,6 +422,30 @@ class App(tk.Tk):
         self.current_wav = None
         self._timer_job = None
         self.test_active = False
+        
+        # Konfigurationshanterare
+        self.config_manager = ConfigManager() if MQTT_SUPPORT else None
+        
+        # MQTT-klient
+        self.mqtt_client = None
+        if MQTT_SUPPORT:
+            try:
+                mqtt_config = get_mqtt_config_from_env()
+                if mqtt_config.get("enabled"):
+                    self.mqtt_client = MQTTClient(mqtt_config)
+                    self.mqtt_client.set_callbacks(
+                        on_start=self.mqtt_on_start,
+                        on_stop=self.mqtt_on_stop,
+                        on_test=self.mqtt_on_test,
+                        on_config_update=self.mqtt_on_config_update
+                    )
+                    self.mqtt_client.connect()
+                    # Publicera initial konfiguration
+                    self.mqtt_client.publish_config(self.config_manager.get_all())
+                    logging.info("MQTT-klient initialiserad och ansluten")
+            except Exception as e:
+                logging.error(f"Kunde inte initiera MQTT-klient: {e}")
+                self.mqtt_client = None
 
     # ---------- Handlers ----------
     def on_gain_change(self, value):
@@ -488,7 +454,42 @@ class App(tk.Tk):
         self.gain_value_label.configure(text=f"{gain:.1f}x")
         self.meter.set_gain(gain)
     
-    def on_test_levels(self):
+    # ---------- MQTT Callbacks ----------
+    def mqtt_on_start(self):
+        """Hantera start-kommando från MQTT"""
+        # Schemalägg kommando i main thread (Tkinter är inte trådsäker)
+        self.after(0, self.on_start)
+    
+    def mqtt_on_stop(self):
+        """Hantera stopp-kommando från MQTT"""
+        self.after(0, self.on_stop)
+    
+    def mqtt_on_test(self):
+        """Hantera test-kommando från MQTT"""
+        self.after(0, self.on_test_levels)
+    
+    def mqtt_on_config_update(self, config_updates):
+        """Hantera konfigurationsuppdatering från MQTT"""
+        if not self.config_manager:
+            return
+        
+        # Uppdatera konfiguration
+        self.config_manager.update(config_updates)
+        
+        # Hantera speciella konfigurationer
+        if "wifi_ssid" in config_updates and "wifi_password" in config_updates:
+            self.config_manager.set_wifi_credentials(
+                config_updates["wifi_ssid"],
+                config_updates["wifi_password"]
+            )
+        
+        # Publicera uppdaterad konfiguration
+        if self.mqtt_client:
+            self.mqtt_client.publish_config(self.config_manager.get_all())
+        
+        logging.info(f"Konfiguration uppdaterad via MQTT: {list(config_updates.keys())}")
+    
+    # ---------- Handlers ----------
         if self.record_proc is not None:
             self.flash_status("Kan inte testa nivåer under inspelning", warn=True)
             return
@@ -532,6 +533,10 @@ class App(tk.Tk):
             self.rec_label.lift()
             self._blink_on = True
             self.tick_timer()
+            # Publicera status till MQTT
+            if self.mqtt_client:
+                room = self.config_manager.get("room", "") if self.config_manager else ""
+                self.mqtt_client.publish_status("recording", {"filename": self.current_wav.name, "room": room})
         except Exception as e:
             self.record_proc = None
             self.flash_status(f"Kunde inte starta inspelning: {e}", warn=True)
@@ -543,6 +548,9 @@ class App(tk.Tk):
         self.stop_recording()
         self.rec_var.set("")
         self.rec_label.lower()
+        # Publicera status till MQTT
+        if self.mqtt_client:
+            self.mqtt_client.publish_status("processing")
         threading.Thread(target=self._convert_and_upload, daemon=True).start()
 
     def stop_recording(self):
@@ -564,20 +572,35 @@ class App(tk.Tk):
         self.current_wav = None
         if not wav or not wav.exists():
             self.flash_status("Fil saknas efter stopp", warn=True)
+            if self.mqtt_client:
+                self.mqtt_client.publish_status("error", {"message": "Fil saknas efter stopp"})
             return
 
         self.status_var.set("Komprimerar (WAV→FLAC)…")
+        if self.mqtt_client:
+            self.mqtt_client.publish_status("converting")
+        
         ok, flac_path, msg = wav_to_flac(wav)
         if not ok:
             self.flash_status(msg, warn=True)
+            if self.mqtt_client:
+                self.mqtt_client.publish_status("error", {"message": msg})
             return
 
         self.status_var.set("Laddar upp…")
+        if self.mqtt_client:
+            self.mqtt_client.publish_status("uploading")
+        
         ok, info = upload_file(flac_path)
         if ok:
             self.flash_status(f"Klar! Uppladdad: {info}")
+            if self.mqtt_client:
+                self.mqtt_client.publish_status("ready")
+                self.mqtt_client.publish_recording_complete(flac_path.name, info)
         else:
             self.flash_status(f"Uppladdning misslyckades: {info}", warn=True)
+            if self.mqtt_client:
+                self.mqtt_client.publish_status("error", {"message": f"Uppladdning misslyckades: {info}"})
 
     def tick_timer(self):
         if self.record_proc is not None and self.record_start is not None:
@@ -603,10 +626,21 @@ class App(tk.Tk):
         else:
             self.configure(bg="#112211")
             self.after(400, lambda: self.configure(bg="#111"))
+    
+    def cleanup(self):
+        """Städa upp resurser vid avslut"""
+        if self.mqtt_client:
+            try:
+                self.mqtt_client.disconnect()
+                logging.info("MQTT-klient frånkopplad")
+            except Exception as e:
+                logging.error(f"Fel vid frånkoppling av MQTT: {e}")
 
 def main():
     try:
         app = App()
+        # Registrera cleanup vid avslut
+        app.protocol("WM_DELETE_WINDOW", lambda: (app.cleanup(), app.destroy()))
     except tk.TclError as exc:
         print("Kunde inte starta GUI:", exc, file=sys.stderr)
         if not os.environ.get("DISPLAY"):
