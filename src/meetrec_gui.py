@@ -430,7 +430,7 @@ class App(tk.Tk):
         
         logging.info(f"Konfiguration uppdaterad via MQTT: {list(config_updates.keys())}")
     
-    # ---------- Handlers ----------
+    def on_test_levels(self):
         if self.record_proc is not None:
             self.flash_status("Kan inte testa nivåer under inspelning", warn=True)
             return
