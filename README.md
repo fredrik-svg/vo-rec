@@ -271,6 +271,22 @@ mqtt:
 - **Volymkontroll**: Använd Gain-reglaget i GUI:t för att justera mikrofonnivåer i realtid (0.1x - 5.0x). Om ljud är för svagt, öka gain; om staplarna klipps vid max, minska gain.
 - **Mono/FLAC**: transkriberingstjänster föredrar ofta mono 16 kHz. Du kan höja kvalitet, alternativt spara fler kanaler.
 
+## 9) Ljudkvalitet och bearbetning
+
+Inspelningar bearbetas automatiskt för att förbättra ljudkvaliteten:
+
+### Automatiska ljudförbättringar
+När en inspelning konverteras från WAV till FLAC appliceras följande filter:
+
+1. **Högpassfilter (150 Hz)** - Tar bort lågfrekvent brus och reducerar rumseko
+2. **Volymförstärkning (Gain)** - Applicerar den gain-nivå du valt med Gain-reglaget i GUI:t
+3. **Loudness-normalisering (EBU R128)** - Optimerar ljudnivån till -16 LUFS utan klippning
+
+### Tips för bättre ljudkvalitet
+- **Låg ljudnivå**: Öka Gain-reglaget till 2.0x-3.0x innan inspelning. Loudness-normaliseringen höjer också nivån automatiskt. Notera att mycket höga gain-värden (>3.0x) kan introducera brus eller distorsion, men normaliseringsfiltret kompenserar för eventuell klippning.
+- **Eko**: Högpassfiltret på 150 Hz reducerar rumseko. För bästa resultat, placera mikrofonen nära talaren och undvik stora rum med hårda ytor.
+- **Brus**: Använd en USB-mikrofon med brusreducering för bästa resultat.
+
 ---
 
 **Licens:** MIT
