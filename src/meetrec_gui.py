@@ -50,9 +50,49 @@ def human_duration(sec):
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def wav_to_flac(wav_path: Path):
+def wav_to_flac(wav_path: Path, gain: float = 1.0):
+    """
+    Konvertera WAV till FLAC med ljudförbättringar.
+    
+    Ljudförbättringar:
+    - Högpassfilter (150 Hz) för att reducera eko och lågfrekvent brus
+    - Volymförstärkning baserat på gain-parameter
+    - Ljudnormalisering för att optimera ljudnivån
+    
+    Args:
+        wav_path: Sökväg till WAV-filen
+        gain: Volymförstärkning (1.0 = normal, 2.0 = dubbel, etc.)
+    
+    Returns:
+        Tuple med (ok, flac_path, meddelande)
+    """
     flac_path = wav_path.with_suffix(".flac")
-    cmd = ["ffmpeg", "-y", "-i", str(wav_path), "-compression_level", "5", str(flac_path)]
+    
+    # Bygg ffmpeg-filter för ljudförbättring
+    audio_filters = []
+    
+    # Högpassfilter för att reducera eko och lågfrekvent brus (150 Hz cutoff)
+    # Detta hjälper till att ta bort rumsakustik och eko
+    audio_filters.append("highpass=f=150")
+    
+    # Volymförstärkning om gain != 1.0
+    if gain != 1.0:
+        audio_filters.append(f"volume={gain}")
+    
+    # Normalisering för att optimera ljudnivån utan klippning
+    # loudnorm är en standardbaserad ljudnormalisering (EBU R128)
+    audio_filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+    
+    filter_chain = ",".join(audio_filters)
+    
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(wav_path),
+        "-af", filter_chain,
+        "-compression_level", "5",
+        str(flac_path)
+    ]
+    
     r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if r.returncode != 0:
         return False, None, "Konvertering WAV->FLAC misslyckades"
@@ -363,6 +403,7 @@ class App(tk.Tk):
         self.current_wav = None
         self._timer_job = None
         self.test_active = False
+        self.recording_gain = 1.0  # Sparar gain-värdet som användes vid inspelning
         
         # Konfigurationshanterare
         self.config_manager = ConfigManager() if MQTT_SUPPORT else None
@@ -462,6 +503,9 @@ class App(tk.Tk):
 
         fname = f"meeting-{ts_name()}.wav"
         self.current_wav = AUDIO_DIR / fname
+        
+        # Spara gain-värdet som ska användas vid konvertering
+        self.recording_gain = self.gain_var.get()
 
         cmd = ["arecord", "-f", FORMAT, "-r", str(SAMPLE_RATE), "-c", "1", str(self.current_wav)]
         if ALSA_DEVICE:
@@ -510,6 +554,7 @@ class App(tk.Tk):
 
     def _convert_and_upload(self):
         wav = self.current_wav
+        gain = self.recording_gain  # Hämta gain-värdet som sparades vid inspelningsstart
         self.current_wav = None
         if not wav or not wav.exists():
             self.flash_status("Fil saknas efter stopp", warn=True)
@@ -517,11 +562,11 @@ class App(tk.Tk):
                 self.mqtt_client.publish_status("error", {"message": "Fil saknas efter stopp"})
             return
 
-        self.status_var.set("Komprimerar (WAV→FLAC)…")
+        self.status_var.set("Komprimerar och förbättrar ljud (WAV→FLAC)…")
         if self.mqtt_client:
             self.mqtt_client.publish_status("converting")
         
-        ok, flac_path, msg = wav_to_flac(wav)
+        ok, flac_path, msg = wav_to_flac(wav, gain=gain)
         if not ok:
             self.flash_status(msg, warn=True)
             if self.mqtt_client:
