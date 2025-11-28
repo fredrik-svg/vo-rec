@@ -283,7 +283,7 @@ När en inspelning konverteras från WAV till FLAC appliceras följande filter:
 3. **Loudness-normalisering (EBU R128)** - Optimerar ljudnivån till -16 LUFS utan klippning
 
 ### Tips för bättre ljudkvalitet
-- **Låg ljudnivå**: Öka Gain-reglaget till 2.0x-3.0x innan inspelning. Loudness-normaliseringen höjer också nivån automatiskt.
+- **Låg ljudnivå**: Öka Gain-reglaget till 2.0x-3.0x innan inspelning. Loudness-normaliseringen höjer också nivån automatiskt. Notera att mycket höga gain-värden (>3.0x) kan introducera brus eller distorsion, men normaliseringsfiltret kompenserar för eventuell klippning.
 - **Eko**: Högpassfiltret på 150 Hz reducerar rumseko. För bästa resultat, placera mikrofonen nära talaren och undvik stora rum med hårda ytor.
 - **Brus**: Använd en USB-mikrofon med brusreducering för bästa resultat.
 

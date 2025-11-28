@@ -81,6 +81,9 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0):
     
     # Normalisering för att optimera ljudnivån utan klippning
     # loudnorm är en standardbaserad ljudnormalisering (EBU R128)
+    # I=-16: Målnivå för integrerad ljudstyrka (-16 LUFS, bra för tal)
+    # TP=-1.5: True Peak max nivå (-1.5 dB, förhindrar klippning)
+    # LRA=11: Loudness Range (11 LU, lämpligt för talat innehåll)
     audio_filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
     
     filter_chain = ",".join(audio_filters)
