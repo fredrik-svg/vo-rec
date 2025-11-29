@@ -39,6 +39,7 @@ HIGHPASS_FREQ = int(os.getenv("HIGHPASS_FREQ", "80"))      # Högpassfilter frek
 LOWPASS_FREQ = int(os.getenv("LOWPASS_FREQ", "8000"))      # Lågpassfilter frekvens (Hz), 8 kHz för tal (Nyquist=8kHz vid 16kHz)
 ENABLE_NOISE_REDUCTION = os.getenv("ENABLE_NOISE_REDUCTION", "true").lower() in ("true", "1", "yes")
 LOUDNORM_TARGET = float(os.getenv("LOUDNORM_TARGET", "-16"))  # EBU R128 målnivå i LUFS
+PRESERVE_CHANNELS = os.getenv("PRESERVE_CHANNELS", "true").lower() in ("true", "1", "yes")  # Behåll alla kanaler (ElevenLabs stöder upp till 5)
 
 # Uppladdning (miljövariabler)
 UPLOAD_TARGET = os.getenv("UPLOAD_TARGET", "n8n").lower()
@@ -123,16 +124,16 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0, channels: int = 1):
     Konvertera WAV till FLAC med ljudförbättringar optimerade för ElevenLabs.
     
     Ljudförbättringar:
-    - Kanalmixning: Om flera kanaler spelats in, kombineras de till mono
     - Högpassfilter för att reducera eko och lågfrekvent brus
     - Lågpassfilter för att ta bort högfrekvent brus över 8 kHz
     - Brusreducering (afftdn) för renare ljud
     - Volymförstärkning baserat på gain-parameter
     - EBU R128 loudness-normalisering för optimal nivå
     
-    ElevenLabs-optimering:
-    - Output: Mono, 16 kHz, 16-bit (PCM S16LE format i FLAC)
-    - Målnivå: -16 LUFS (optimal för voice cloning)
+    ElevenLabs stöder:
+    - Format: MP3, WAV, FLAC, OGG, AAC, OPUS, WEBM, MP4
+    - Kanaler: Mono till 5 kanaler (multichannel mode)
+    - Sample rates: 8kHz-48kHz (16kHz tillräckligt för tal)
     
     Args:
         wav_path: Sökväg till WAV-filen
@@ -147,9 +148,11 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0, channels: int = 1):
     # Bygg ffmpeg-filter för ljudförbättring
     audio_filters = []
     
-    # Om vi har flera kanaler, mixa ner till mono
-    # ReSpeaker 4-Mic Array: kombinera alla mikrofoner för bättre SNR
-    if channels > 1:
+    # Kanalhantering: behåll alla kanaler eller mixa till mono
+    output_channels = channels if PRESERVE_CHANNELS else 1
+    
+    # Om vi ska mixa ner till mono och har flera kanaler
+    if not PRESERVE_CHANNELS and channels > 1:
         # Bygg dynamiskt pan-filter baserat på antal kanaler
         # Varje kanal får lika vikt (1/channels)
         weight = 1.0 / channels
@@ -186,9 +189,9 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0, channels: int = 1):
         "ffmpeg", "-y",
         "-i", str(wav_path),
         "-af", filter_chain,
-        "-ac", "1",                 # Säkerställ mono output för ElevenLabs
-        "-ar", str(SAMPLE_RATE),    # Behåll sample rate (16 kHz)
-        "-compression_level", "5",   # Balanserad kompression (0-8, 5 ger bra kvalitet/prestanda)
+        "-ac", str(output_channels),  # Behåll kanaler eller mixa till mono
+        "-ar", str(SAMPLE_RATE),      # Behåll sample rate (16 kHz)
+        "-compression_level", "5",     # Balanserad kompression (0-8, 5 ger bra kvalitet/prestanda)
         str(flac_path)
     ]
     

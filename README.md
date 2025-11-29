@@ -306,19 +306,18 @@ mqtt:
   - GUI:t visar de första `CHANNELS_TEST` kanalerna
   - För ReSpeaker 4-Mic Array v2.0 med 6 kanaler (4 mic + 2 ref), sätt `CHANNELS_TEST=4` för att visa de fyra mikrofonerna
 - **Volymkontroll**: Använd Gain-reglaget i GUI:t för att justera mikrofonnivåer i realtid (0.1x - 5.0x). Om ljud är för svagt, öka gain; om staplarna klipps vid max, minska gain.
-- **Multi-kanal inspelning**: Sätt `CHANNELS_RECORD=4` för att spela in med alla 4 mikrofoner på ReSpeaker. Kanalerna kombineras automatiskt till mono för bättre ljudkvalitet.
+- **Multi-kanal inspelning**: Sätt `CHANNELS_RECORD=4` för att spela in med alla 4 mikrofoner på ReSpeaker. Kanalerna bevaras som standard för bästa kvalitet med ElevenLabs.
 
 ## 9) Ljudkvalitet och ElevenLabs-optimering
 
 Inspelningar är optimerade för ElevenLabs voice cloning och annan AI-baserad talbearbetning.
 
-### ElevenLabs-krav
-ElevenLabs voice cloning kräver:
-- **Format**: PCM S16LE (16-bit little-endian)
-- **Sample rate**: 16 kHz (optimal för tal)
-- **Kanaler**: Mono
-
-Dessa inställningar är standard och används automatiskt.
+### ElevenLabs-stöd
+ElevenLabs stöder:
+- **Format**: MP3, WAV, FLAC, OGG, AAC, OPUS, WEBM, MP4
+- **Kanaler**: Mono till 5 kanaler (multichannel mode)
+- **Sample rates**: 8kHz-48kHz (16 kHz tillräckligt för tal)
+- **Fillimit**: API 1GB, Web 3GB, max 4.5h längd
 
 ### ReSpeaker 4-Mic Array
 ReSpeaker 4-Mic Array har följande specifikationer:
@@ -332,7 +331,7 @@ För bästa kvalitet med ReSpeaker, sätt `CHANNELS_RECORD=4` för att använda 
 ### Automatiska ljudförbättringar
 När en inspelning konverteras från WAV till FLAC appliceras följande filter:
 
-1. **Kanalmixning** - Om flera kanaler spelats in kombineras de till mono med lika vikt
+1. **Kanalhantering** - Bevarar alla kanaler (standard) eller mixar till mono med `PRESERVE_CHANNELS=false`
 2. **Högpassfilter (80 Hz)** - Tar bort lågfrekvent brus och rumsakustik (konfigurerbart med `HIGHPASS_FREQ`)
 3. **Lågpassfilter (8 kHz)** - Tar bort högfrekvent brus (konfigurerbart med `LOWPASS_FREQ`)
 4. **Brusreducering (afftdn)** - FFT-baserad brusreducering för renare tal (konfigurerbart med `ENABLE_NOISE_REDUCTION`)
@@ -348,6 +347,7 @@ SAMPLE_RATE=16000           # Sample rate (16 kHz max för ReSpeaker)
 AUDIO_FORMAT=S16_LE         # 16-bit PCM
 CHANNELS_TEST=4             # Kanaler att visa i testläget
 CHANNELS_RECORD=4           # Kanaler vid inspelning (1 eller 4)
+PRESERVE_CHANNELS=true      # Behåll alla kanaler (ElevenLabs stöder upp till 5)
 ALSA_DEVICE=hw:1,0          # ReSpeaker-enhet
 
 # Avancerade ljudfilter
@@ -361,7 +361,7 @@ LOUDNORM_TARGET=-16         # Målnivå i LUFS
 - **Låg ljudnivå**: Öka Gain-reglaget till 2.0x-3.0x innan inspelning. Loudness-normaliseringen höjer också nivån automatiskt.
 - **Eko**: Högpassfiltret reducerar rumseko. För bästa resultat, placera mikrofonen nära talaren.
 - **Brus**: Brusreducering är aktiverad som standard. Inaktivera med `ENABLE_NOISE_REDUCTION=false` om du vill ha originalljudet.
-- **Multi-mikrofon**: Med `CHANNELS_RECORD=4` kombineras alla mikrofoner för bättre signal-brusförhållande.
+- **Multi-mikrofon**: Med `CHANNELS_RECORD=4` och `PRESERVE_CHANNELS=true` bevaras alla 4 mikrofonkanaler för ElevenLabs multichannel-stöd.
 
 ---
 
