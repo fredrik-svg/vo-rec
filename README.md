@@ -324,6 +324,11 @@ När en inspelning konverteras från WAV till FLAC appliceras följande filter:
 - **Eko**: Högpassfiltret på 150 Hz reducerar rumseko. För bästa resultat, placera mikrofonen nära talaren och undvik stora rum med hårda ytor.
 - **Brus**: Använd en USB-mikrofon med brusreducering för bästa resultat.
 
+### ElevenLabs Speech-to-Text
+För detaljerad information om ljudformat som stöds av ElevenLabs Speech-to-Text (inklusive stereo/flerkanal-stöd), se **[ELEVENLABS_AUDIO_FORMATS.md](ELEVENLABS_AUDIO_FORMATS.md)**.
+
+**Sammanfattning**: ElevenLabs stöder både mono och stereo/flerkanaligt ljud (upp till 5 kanaler), samt format som MP3, WAV, FLAC, OGG, AAC, OPUS, WEBM och MP4. Mono 16 kHz (som vo-rec använder som standard) fungerar utmärkt för de flesta transkriberings-scenarier.
+
 ---
 
 **Licens:** MIT
