@@ -41,6 +41,65 @@ HTTP_AUTH_HEADER  = os.getenv("HTTP_AUTH_HEADER")
 N8N_WEBHOOK_URL   = os.getenv("N8N_WEBHOOK_URL")
 N8N_AUTH_HEADER   = os.getenv("N8N_AUTH_HEADER")
 
+# MQTT konfiguration
+MQTT_BROKER       = os.getenv("MQTT_BROKER")
+MQTT_PORT         = int(os.getenv("MQTT_PORT", "8883"))
+MQTT_USERNAME     = os.getenv("MQTT_USERNAME")
+MQTT_PASSWORD     = os.getenv("MQTT_PASSWORD")
+MQTT_TOPIC        = os.getenv("MQTT_TOPIC", "recordings/meetings")
+MQTT_USE_TLS      = os.getenv("MQTT_USE_TLS", "true").lower() in ("true", "1", "yes")
+
+# ---- Google Drive ----
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from google.oauth2.service_account import Credentials as SACredentials
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials as OAuthCredentials
+
+DRIVE_AUTH_TYPE = os.getenv("DRIVE_AUTH_TYPE", "service_account").lower()  # "service_account" | "oauth"
+DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID", "")
+DRIVE_SERVICE_ACCOUNT_JSON = os.getenv("DRIVE_SERVICE_ACCOUNT_JSON")  # path till SA.json
+DRIVE_CLIENT_SECRETS = os.getenv("DRIVE_CLIENT_SECRETS")              # path till OAuth client_secret.json
+DRIVE_TOKEN_PATH = os.getenv("DRIVE_TOKEN_PATH", str(Path.home()/ "meetrec" / "token.json"))
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+_drive_service = None   # cachead klient
+
+def get_drive_service():
+    global _drive_service
+    if _drive_service:
+        return _drive_service
+
+    if DRIVE_AUTH_TYPE == "service_account":
+        if not DRIVE_SERVICE_ACCOUNT_JSON or not Path(DRIVE_SERVICE_ACCOUNT_JSON).exists():
+            raise RuntimeError("Saknar service account JSON (DRIVE_SERVICE_ACCOUNT_JSON).")
+        creds = SACredentials.from_service_account_file(
+            DRIVE_SERVICE_ACCOUNT_JSON, scopes=DRIVE_SCOPES
+        )
+        _drive_service = build("drive", "v3", credentials=creds)
+        return _drive_service
+
+    elif DRIVE_AUTH_TYPE == "oauth":
+        creds = None
+        if Path(DRIVE_TOKEN_PATH).exists():
+            creds = OAuthCredentials.from_authorized_user_file(DRIVE_TOKEN_PATH, DRIVE_SCOPES)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                from google_auth_oauthlib.flow import InstalledAppFlow
+                if not DRIVE_CLIENT_SECRETS or not Path(DRIVE_CLIENT_SECRETS).exists():
+                    raise RuntimeError("Saknar CLIENT_SECRETS (DRIVE_CLIENT_SECRETS).")
+                flow = InstalledAppFlow.from_client_secrets_file(DRIVE_CLIENT_SECRETS, DRIVE_SCOPES)
+                creds = flow.run_console()  # visar URL i terminalen
+            Path(DRIVE_TOKEN_PATH).parent.mkdir(parents=True, exist_ok=True)
+            with open(DRIVE_TOKEN_PATH, "w") as f:
+                f.write(creds.to_json())
+        _drive_service = build("drive", "v3", credentials=creds)
+        return _drive_service
+
+    else:
+        raise RuntimeError(f"Okänt DRIVE_AUTH_TYPE: {DRIVE_AUTH_TYPE}")
+
 # ========= Hjälp =========
 def ts_name():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
