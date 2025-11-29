@@ -25,11 +25,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 AUDIO_DIR     = Path.home() / "meet_recordings"
 AUDIO_DIR.mkdir(exist_ok=True)
 
-SAMPLE_RATE   = 16000         # Räcker fint för tal
-FORMAT        = "S16_LE"      # 16-bit PCM
-CHANNELS_TEST = 4             # Antal kanaler att visa i "Testa nivåer" (ändra vid behov)
-ALSA_DEVICE   = None          # None => standard. Eller t.ex. "hw:1,0" för ReSpeaker
+# Ljudinställningar - optimerade för ElevenLabs och ReSpeaker 4-Mic Array
+# ReSpeaker 4-Mic Array har max 16 kHz sample rate (hårdvarubegränsning)
+SAMPLE_RATE   = int(os.getenv("SAMPLE_RATE", "16000"))     # 16 kHz är max för ReSpeaker och optimal för ElevenLabs
+FORMAT        = os.getenv("AUDIO_FORMAT", "S16_LE")        # 16-bit PCM (krav för ElevenLabs)
+CHANNELS_TEST = int(os.getenv("CHANNELS_TEST", "4"))       # Antal kanaler att visa i "Testa nivåer"
+CHANNELS_RECORD = int(os.getenv("CHANNELS_RECORD", "1"))   # Kanaler vid inspelning (1=mono, 4=alla mics)
+ALSA_DEVICE   = os.getenv("ALSA_DEVICE", None)             # None => standard. Eller t.ex. "hw:1,0" för ReSpeaker
 MAX_HOURS     = 8
+
+# Avancerade ljudinställningar för ElevenLabs-optimering
+HIGHPASS_FREQ = int(os.getenv("HIGHPASS_FREQ", "80"))      # Högpassfilter frekvens (Hz), 80 Hz bevarar mer bas
+LOWPASS_FREQ = int(os.getenv("LOWPASS_FREQ", "8000"))      # Lågpassfilter frekvens (Hz), 8 kHz för tal (Nyquist=8kHz vid 16kHz)
+ENABLE_NOISE_REDUCTION = os.getenv("ENABLE_NOISE_REDUCTION", "true").lower() in ("true", "1", "yes")
+LOUDNORM_TARGET = float(os.getenv("LOUDNORM_TARGET", "-16"))  # EBU R128 målnivå i LUFS
 
 # Uppladdning (miljövariabler)
 UPLOAD_TARGET = os.getenv("UPLOAD_TARGET", "n8n").lower()
@@ -109,18 +118,26 @@ def human_duration(sec):
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def wav_to_flac(wav_path: Path, gain: float = 1.0):
+def wav_to_flac(wav_path: Path, gain: float = 1.0, channels: int = 1):
     """
-    Konvertera WAV till FLAC med ljudförbättringar.
+    Konvertera WAV till FLAC med ljudförbättringar optimerade för ElevenLabs.
     
     Ljudförbättringar:
-    - Högpassfilter (150 Hz) för att reducera eko och lågfrekvent brus
+    - Kanalmixning: Om flera kanaler spelats in, kombineras de till mono
+    - Högpassfilter för att reducera eko och lågfrekvent brus
+    - Lågpassfilter för att ta bort högfrekvent brus över 8 kHz
+    - Brusreducering (afftdn) för renare ljud
     - Volymförstärkning baserat på gain-parameter
-    - Ljudnormalisering för att optimera ljudnivån
+    - EBU R128 loudness-normalisering för optimal nivå
+    
+    ElevenLabs-optimering:
+    - Output: Mono, 16 kHz, 16-bit (PCM S16LE format i FLAC)
+    - Målnivå: -16 LUFS (optimal för voice cloning)
     
     Args:
         wav_path: Sökväg till WAV-filen
         gain: Volymförstärkning (1.0 = normal, 2.0 = dubbel, etc.)
+        channels: Antal kanaler i inspelningen (1-4)
     
     Returns:
         Tuple med (ok, flac_path, meddelande)
@@ -130,20 +147,36 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0):
     # Bygg ffmpeg-filter för ljudförbättring
     audio_filters = []
     
-    # Högpassfilter för att reducera eko och lågfrekvent brus (150 Hz cutoff)
-    # Detta hjälper till att ta bort rumsakustik och eko
-    audio_filters.append("highpass=f=150")
+    # Om vi har flera kanaler, mixa ner till mono
+    # ReSpeaker 4-Mic Array: kombinera alla 4 mikrofoner för bättre SNR
+    if channels > 1:
+        # pan-filter för att mixa alla kanaler till mono med lika vikt
+        # Detta ger bättre ljudkvalitet genom att kombinera alla mikrofoner
+        audio_filters.append("pan=mono|c0=0.25*c0+0.25*c1+0.25*c2+0.25*c3")
+    
+    # Högpassfilter för att reducera eko och lågfrekvent brus
+    # 80 Hz cutoff bevarar mer bas i rösten än tidigare 150 Hz
+    audio_filters.append(f"highpass=f={HIGHPASS_FREQ}")
+    
+    # Lågpassfilter för att ta bort högfrekvent brus
+    # Vid 16 kHz sample rate är Nyquist-frekvensen 8 kHz, så vi filtrerar strax under
+    if LOWPASS_FREQ < (SAMPLE_RATE // 2):
+        audio_filters.append(f"lowpass=f={LOWPASS_FREQ}")
+    
+    # Brusreducering med afftdn (Adaptive FFT Denoiser) för renare tal
+    # Använd mild brusreducering för att inte påverka röstkaraktären
+    if ENABLE_NOISE_REDUCTION:
+        audio_filters.append("afftdn=nf=-25")
     
     # Volymförstärkning om gain != 1.0
     if gain != 1.0:
         audio_filters.append(f"volume={gain}")
     
-    # Normalisering för att optimera ljudnivån utan klippning
-    # loudnorm är en standardbaserad ljudnormalisering (EBU R128)
-    # I=-16: Målnivå för integrerad ljudstyrka (-16 LUFS, bra för tal)
+    # EBU R128 Loudness-normalisering för optimal nivå till ElevenLabs
+    # I=-16: Målnivå för integrerad ljudstyrka (-16 LUFS, optimal för voice cloning)
     # TP=-1.5: True Peak max nivå (-1.5 dB, förhindrar klippning)
     # LRA=11: Loudness Range (11 LU, lämpligt för talat innehåll)
-    audio_filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+    audio_filters.append(f"loudnorm=I={LOUDNORM_TARGET}:TP=-1.5:LRA=11")
     
     filter_chain = ",".join(audio_filters)
     
@@ -151,7 +184,9 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0):
         "ffmpeg", "-y",
         "-i", str(wav_path),
         "-af", filter_chain,
-        "-compression_level", "5",
+        "-ac", "1",                 # Säkerställ mono output för ElevenLabs
+        "-ar", str(SAMPLE_RATE),    # Behåll sample rate (16 kHz)
+        "-compression_level", "8",   # Högre kompression för bättre kvalitet
         str(flac_path)
     ]
     
@@ -566,12 +601,15 @@ class App(tk.Tk):
         fname = f"meeting-{ts_name()}.wav"
         self.current_wav = AUDIO_DIR / fname
         
-        # Spara gain-värdet som ska användas vid konvertering
+        # Spara gain-värdet och kanalinställningar för konvertering
         self.recording_gain = self.gain_var.get()
+        self.recording_channels = CHANNELS_RECORD
 
-        cmd = ["arecord", "-f", FORMAT, "-r", str(SAMPLE_RATE), "-c", "1", str(self.current_wav)]
+        # Bygg arecord-kommando med konfigurerbara kanaler
+        # ReSpeaker 4-Mic Array: använd 4 kanaler för bästa kvalitet
+        cmd = ["arecord", "-f", FORMAT, "-r", str(SAMPLE_RATE), "-c", str(CHANNELS_RECORD), str(self.current_wav)]
         if ALSA_DEVICE:
-            cmd = ["arecord", "-D", ALSA_DEVICE, "-f", FORMAT, "-r", str(SAMPLE_RATE), "-c", "1", str(self.current_wav)]
+            cmd = ["arecord", "-D", ALSA_DEVICE, "-f", FORMAT, "-r", str(SAMPLE_RATE), "-c", str(CHANNELS_RECORD), str(self.current_wav)]
 
         try:
             self.record_proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
@@ -617,6 +655,7 @@ class App(tk.Tk):
     def _convert_and_upload(self):
         wav = self.current_wav
         gain = self.recording_gain  # Hämta gain-värdet som sparades vid inspelningsstart
+        channels = getattr(self, 'recording_channels', 1)  # Antal kanaler vid inspelning
         self.current_wav = None
         if not wav or not wav.exists():
             self.flash_status("Fil saknas efter stopp", warn=True)
@@ -624,11 +663,11 @@ class App(tk.Tk):
                 self.mqtt_client.publish_status("error", {"message": "Fil saknas efter stopp"})
             return
 
-        self.status_var.set("Komprimerar och förbättrar ljud (WAV→FLAC)…")
+        self.status_var.set("Komprimerar och förbättrar ljud för ElevenLabs (WAV→FLAC)…")
         if self.mqtt_client:
             self.mqtt_client.publish_status("converting")
         
-        ok, flac_path, msg = wav_to_flac(wav, gain=gain)
+        ok, flac_path, msg = wav_to_flac(wav, gain=gain, channels=channels)
         if not ok:
             self.flash_status(msg, warn=True)
             if self.mqtt_client:
