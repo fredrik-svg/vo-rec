@@ -148,11 +148,13 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0, channels: int = 1):
     audio_filters = []
     
     # Om vi har flera kanaler, mixa ner till mono
-    # ReSpeaker 4-Mic Array: kombinera alla 4 mikrofoner för bättre SNR
+    # ReSpeaker 4-Mic Array: kombinera alla mikrofoner för bättre SNR
     if channels > 1:
-        # pan-filter för att mixa alla kanaler till mono med lika vikt
-        # Detta ger bättre ljudkvalitet genom att kombinera alla mikrofoner
-        audio_filters.append("pan=mono|c0=0.25*c0+0.25*c1+0.25*c2+0.25*c3")
+        # Bygg dynamiskt pan-filter baserat på antal kanaler
+        # Varje kanal får lika vikt (1/channels)
+        weight = 1.0 / channels
+        channel_mix = "+".join([f"{weight:.4f}*c{i}" for i in range(channels)])
+        audio_filters.append(f"pan=mono|c0={channel_mix}")
     
     # Högpassfilter för att reducera eko och lågfrekvent brus
     # 80 Hz cutoff bevarar mer bas i rösten än tidigare 150 Hz
@@ -186,7 +188,7 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0, channels: int = 1):
         "-af", filter_chain,
         "-ac", "1",                 # Säkerställ mono output för ElevenLabs
         "-ar", str(SAMPLE_RATE),    # Behåll sample rate (16 kHz)
-        "-compression_level", "8",   # Högre kompression för bättre kvalitet
+        "-compression_level", "5",   # Balanserad kompression (0-8, 5 ger bra kvalitet/prestanda)
         str(flac_path)
     ]
     
