@@ -53,7 +53,7 @@ ElevenLabs Speech-to-Text accepterar följande ljudformat:
 | 48 kHz | Studiekvalitet |
 
 ### Bitrater för MP3
-- 32 kbps - 192 kbps beroende på prenumerationstyp
+- 32 kbps - 192 kbps (faktiska begränsningar kan variera beroende på prenumerationstyp, se ElevenLabs dokumentation för aktuella begränsningar)
 
 ### PCM och Opus
 - PCM: 8 kHz till 48 kHz
@@ -63,8 +63,11 @@ ElevenLabs Speech-to-Text accepterar följande ljudformat:
 
 | Begränsning | Värde |
 |-------------|-------|
-| Maximal filstorlek | 1 GB (upp till 3 GB via webgränssnittet) |
+| Maximal filstorlek (API) | 1 GB |
+| Maximal filstorlek (webbgränssnitt) | 3 GB |
 | Maximal längd | 4,5 timmar per fil |
+
+**Obs**: Vid programmatisk integration via API gäller 1 GB-gränsen.
 
 ## Rekommendationer för vo-rec
 
@@ -112,7 +115,7 @@ cmd = ["arecord", "-f", FORMAT, "-r", str(SAMPLE_RATE), "-c", "2", str(self.curr
 
 4. **För arkivering**: FLAC ger förlustfri komprimering och stöds av ElevenLabs
 
-5. **Undvik onödigt hög kvalitet**: 48 kHz ger ingen förbättring för tal-transkribering jämfört med 16 kHz, men ökar filstorleken markant
+5. **Samplingsfrekvens**: Generellt räcker 16 kHz för tal-transkribering då mänskligt tal ligger under 8 kHz. Högre samplingsfrekvenser (44.1 kHz, 48 kHz) ökar filstorleken utan tydlig förbättring av transkriberingskvaliteten för normalt tal
 
 ## Referenser
 
