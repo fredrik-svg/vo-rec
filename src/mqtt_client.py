@@ -127,6 +127,7 @@ class MQTTClient:
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_subscribe = self._on_subscribe
         
         # TLS/SSL för HiveMQ Cloud och andra säkra brokers
         if self.use_tls:
@@ -172,8 +173,10 @@ class MQTTClient:
             logger.info("Ansluten till MQTT-broker")
             self.connected = True
             # Prenumerera på kommandotopics
-            client.subscribe(self.topic_command)
-            client.subscribe(self.topic_config_set)
+            result_cmd, mid_cmd = client.subscribe(self.topic_command)
+            result_cfg, mid_cfg = client.subscribe(self.topic_config_set)
+            logger.info(f"Prenumererar på kommandotopic: {self.topic_command} (result={result_cmd}, mid={mid_cmd})")
+            logger.info(f"Prenumererar på konfigurationstopic: {self.topic_config_set} (result={result_cfg}, mid={mid_cfg})")
             # Publicera initial status
             self.publish_status("ready")
         else:
@@ -185,18 +188,26 @@ class MQTTClient:
         if rc != 0:
             logger.warning(f"Oväntad frånkoppling från MQTT-broker: {rc}")
     
+    def _on_subscribe(self, client, userdata, mid, granted_qos):
+        """Callback när prenumeration bekräftas"""
+        logger.info(f"Prenumeration bekräftad: mid={mid}, granted_qos={granted_qos}")
+    
     def _on_message(self, client, userdata, msg):
         """Callback när meddelande tas emot"""
         topic = msg.topic
         payload = msg.payload.decode('utf-8')
         
-        logger.debug(f"MQTT meddelande mottaget: {topic} = {payload}")
+        logger.info(f"MQTT meddelande mottaget på topic '{topic}': {payload}")
         
         try:
             if topic == self.topic_command:
+                logger.info(f"Behandlar kommando från topic '{topic}'")
                 self._handle_command(payload)
             elif topic == self.topic_config_set:
+                logger.info(f"Behandlar konfigurationsuppdatering från topic '{topic}'")
                 self._handle_config_set(payload)
+            else:
+                logger.warning(f"Meddelande mottaget på okänt topic: {topic}")
         except Exception as e:
             logger.error(f"Fel vid hantering av MQTT-meddelande: {e}")
     
@@ -207,15 +218,24 @@ class MQTTClient:
         if command == "start":
             logger.info("MQTT kommando: Start inspelning")
             if self.on_start_callback:
+                logger.info("Anropar on_start_callback")
                 self.on_start_callback()
+            else:
+                logger.warning("on_start_callback är inte satt!")
         elif command == "stop":
             logger.info("MQTT kommando: Stoppa inspelning")
             if self.on_stop_callback:
+                logger.info("Anropar on_stop_callback")
                 self.on_stop_callback()
+            else:
+                logger.warning("on_stop_callback är inte satt!")
         elif command == "test":
             logger.info("MQTT kommando: Testa nivåer")
             if self.on_test_callback:
+                logger.info("Anropar on_test_callback")
                 self.on_test_callback()
+            else:
+                logger.warning("on_test_callback är inte satt!")
         else:
             logger.warning(f"Okänt MQTT kommando: {command}")
     
