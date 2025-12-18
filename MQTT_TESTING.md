@@ -162,7 +162,7 @@ with open(data['filename'], 'wb') as f:
      - `"Anropar on_start_callback"` - Invoking callback
   4. **Test locally**: Run the test script to verify MQTT handling works:
      ```bash
-     python3 examples/test_mqtt_commands.py
+     python3 examples/mqtt_command_test.py
      ```
   5. **Check callback registration**: Ensure the GUI has registered callbacks with the MQTT client
   6. **Verify topic normalization**: The app automatically normalizes topics (removes leading/trailing slashes, etc.). Check logs for the normalized topic format.

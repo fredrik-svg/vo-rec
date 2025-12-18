@@ -289,7 +289,7 @@ Om MQTT-kommandon inte fungerar:
    - `"Anropar on_start_callback"` - Anropar callback
 4. **Testa lokalt**: Kör testskriptet för att verifiera MQTT-hantering:
    ```bash
-   python3 examples/test_mqtt_commands.py
+   python3 examples/mqtt_command_test.py
    ```
 5. **Använd interaktiv klient**: Kör exempel-klienten för att testa kommandon:
    ```bash
