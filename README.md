@@ -274,6 +274,28 @@ mosquitto_pub -h mqtt.example.com -t "meetrec/device1/config/set" -m '{"room":"K
 mosquitto_sub -h mqtt.example.com -t "meetrec/device1/#"
 ```
 
+### Felsökning MQTT-kommandon
+
+Om MQTT-kommandon inte fungerar:
+
+1. **Kontrollera att MQTT är aktiverat**: `MQTT_ENABLED=true` i `.env`
+2. **Verifiera topic**: Kontrollera att du skickar till rätt topic (t.ex. `meetrec/device1/command`)
+3. **Granska loggar**: MQTT-klienten har omfattande loggning. Leta efter:
+   - `"Ansluten till MQTT-broker"` - Anslutning etablerad
+   - `"Prenumererar på kommandotopic"` - Prenumererar på kommandotopic
+   - `"Prenumeration bekräftad"` - Prenumeration bekräftad
+   - `"MQTT meddelande mottaget"` - Meddelande mottaget
+   - `"Behandlar kommando"` - Bearbetar kommando
+   - `"Anropar on_start_callback"` - Anropar callback
+4. **Testa lokalt**: Kör testskriptet för att verifiera MQTT-hantering:
+   ```bash
+   python3 examples/test_mqtt_commands.py
+   ```
+5. **Använd interaktiv klient**: Kör exempel-klienten för att testa kommandon:
+   ```bash
+   python3 examples/mqtt_client_example.py
+   ```
+
 ### Home Assistant integration
 
 Exempel på Home Assistant-konfiguration för att styra inspelaren:

@@ -148,6 +148,25 @@ with open(data['filename'], 'wb') as f:
   - Ensure subscriber is connected before publishing
   - Check QoS level (should be 1 for reliable delivery)
 
+### MQTT Commands Not Working
+- **Issue**: Sending commands to MQTT but the device doesn't respond
+- **Solution**:
+  1. **Check MQTT is enabled**: Ensure `MQTT_ENABLED=true` in `.env`
+  2. **Verify topic prefix**: Make sure you're sending to the correct topic (e.g., `meetrec/device1/command`)
+  3. **Check logs**: The MQTT client now has comprehensive logging. Look for:
+     - `"Ansluten till MQTT-broker"` - Connection established
+     - `"Prenumererar på kommandotopic"` - Subscribing to command topic
+     - `"Prenumeration bekräftad"` - Subscription confirmed
+     - `"MQTT meddelande mottaget"` - Message received
+     - `"Behandlar kommando"` - Processing command
+     - `"Anropar on_start_callback"` - Invoking callback
+  4. **Test locally**: Run the test script to verify MQTT handling works:
+     ```bash
+     python3 examples/test_mqtt_commands.py
+     ```
+  5. **Check callback registration**: Ensure the GUI has registered callbacks with the MQTT client
+  6. **Verify topic normalization**: The app automatically normalizes topics (removes leading/trailing slashes, etc.). Check logs for the normalized topic format.
+
 ### Large Files
 - **Issue**: Large recordings fail to upload
 - **Solution**:
