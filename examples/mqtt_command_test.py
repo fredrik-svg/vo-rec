@@ -19,8 +19,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Import MQTT client
-sys.path.insert(0, 'src')
+# Import MQTT client - add parent directory to path
+import os
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(parent_dir, 'src'))
 from mqtt_client import MQTTClient
 
 def test_mqtt_client_initialization():
