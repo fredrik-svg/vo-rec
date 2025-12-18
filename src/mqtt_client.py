@@ -154,6 +154,14 @@ class MQTTClient:
             
         try:
             logger.info(f"Ansluter till MQTT-broker {self.broker}:{self.port}")
+            logger.info("=" * 60)
+            logger.info("MQTT Topics:")
+            logger.info(f"  Kommandon (subscribe): {self.topic_command}")
+            logger.info(f"  Status (publish):      {self.topic_status}")
+            logger.info(f"  Config (publish):      {self.topic_config}")
+            logger.info(f"  Config set (subscribe): {self.topic_config_set}")
+            logger.info(f"  Inspelningar (publish): {self.topic_recording}")
+            logger.info("=" * 60)
             self.client.connect(self.broker, self.port, 60)
             self.client.loop_start()
         except Exception as e:
