@@ -155,11 +155,11 @@ with open(data['filename'], 'wb') as f:
   2. **Verify topic prefix**: Make sure you're sending to the correct topic (e.g., `meetrec/device1/command`)
   3. **Check logs**: The MQTT client now has comprehensive logging. Look for:
      - `"Ansluten till MQTT-broker"` - Connection established
-     - `"Prenumererar på kommandotopic"` - Subscribing to command topic
-     - `"Prenumeration bekräftad"` - Subscription confirmed
-     - `"MQTT meddelande mottaget"` - Message received
-     - `"Behandlar kommando"` - Processing command
-     - `"Anropar on_start_callback"` - Invoking callback
+     - `"Prenumererar på kommandotopic: ..."` - Subscribing to command topic (shows topic, result, and message ID)
+     - `"Prenumeration bekräftad: ..."` - Subscription confirmed (shows message ID and QoS)
+     - `"MQTT meddelande mottaget på topic '...': ..."` - Message received (shows topic and payload)
+     - `"Behandlar kommando från topic '...'"` - Processing command (shows which topic)
+     - `"Anropar on_start_callback"` - Invoking start callback
   4. **Test locally**: Run the test script to verify MQTT handling works:
      ```bash
      python3 examples/mqtt_command_test.py
