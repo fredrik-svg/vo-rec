@@ -476,6 +476,7 @@ class App(tk.Tk):
             try:
                 mqtt_config = get_mqtt_config_from_env()
                 if mqtt_config.get("enabled"):
+                    logging.info("Initierar MQTT-klient...")
                     self.mqtt_client = MQTTClient(mqtt_config)
                     self.mqtt_client.set_callbacks(
                         on_start=self.mqtt_on_start,
@@ -487,6 +488,8 @@ class App(tk.Tk):
                     # Publicera initial konfiguration
                     self.mqtt_client.publish_config(self.config_manager.get_all())
                     logging.info("MQTT-klient initialiserad och ansluten")
+                else:
+                    logging.info("MQTT är inte aktiverat (MQTT_ENABLED=false)")
             except Exception as e:
                 logging.error(f"Kunde inte initiera MQTT-klient: {e}")
                 self.mqtt_client = None
