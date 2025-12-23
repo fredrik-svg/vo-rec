@@ -234,7 +234,7 @@ class MQTTClient:
         try:
             data = json.loads(payload)
             command = data.get("command", "").lower().strip()
-            email = data.get("email", "").strip()
+            email = data.get("email", "").strip() or None
             if email:
                 logger.info("Email extraherad från JSON-kommando")
         except (json.JSONDecodeError, AttributeError):
