@@ -236,7 +236,7 @@ class MQTTClient:
             command = data.get("command", "").lower().strip()
             email = data.get("email", "").strip()
             if email:
-                logger.info(f"Email extraherad från kommando: {email}")
+                logger.info("Email extraherad från JSON-kommando")
         except (json.JSONDecodeError, AttributeError):
             # Fallback till ren text för bakåtkompatibilitet
             command = payload.lower().strip()

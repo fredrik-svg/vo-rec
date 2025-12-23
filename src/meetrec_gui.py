@@ -221,7 +221,7 @@ def upload_file(flac_path: Path, email: str = None, room: str = None):
                 # Lägg till email om den finns
                 if email:
                     data["email"] = email
-                    logging.info(f"Skickar email till n8n: {email}")
+                    logging.info("Skickar email till n8n")
                 
                 # Lägg till room om den finns
                 if room:
@@ -526,7 +526,7 @@ class App(tk.Tk):
         # Spara email för denna inspelningssession
         self.current_email = email
         if email:
-            logging.info(f"Start-kommando mottaget med email: {email}")
+            logging.info("Start-kommando mottaget med email")
         # Schemalägg kommando i main thread (Tkinter är inte trådsäker)
         self.after(0, self.on_start)
     
