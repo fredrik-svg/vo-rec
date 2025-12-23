@@ -220,14 +220,37 @@ class MQTTClient:
             logger.error(f"Fel vid hantering av MQTT-meddelande: {e}")
     
     def _handle_command(self, payload: str):
-        """Hantera kommando från MQTT"""
-        command = payload.lower().strip()
+        """
+        Hantera kommando från MQTT.
+        
+        Stöder både JSON-format och ren text för bakåtkompatibilitet:
+        - JSON: {"command": "start", "email": "user@example.com"}
+        - Text: "start"
+        """
+        command = None
+        email = None
+        
+        # Försök först parsa som JSON
+        try:
+            data = json.loads(payload)
+            command = data.get("command", "").lower().strip()
+            email = data.get("email", "").strip()
+            if email:
+                logger.info(f"Email extraherad från kommando: {email}")
+        except (json.JSONDecodeError, AttributeError):
+            # Fallback till ren text för bakåtkompatibilitet
+            command = payload.lower().strip()
+            logger.debug("Kommando parsat som ren text (bakåtkompatibilitet)")
         
         if command == "start":
             logger.info("MQTT kommando: Start inspelning")
             if self.on_start_callback:
                 logger.info("Anropar on_start_callback")
-                self.on_start_callback()
+                # Skicka email som parameter om det finns
+                if email:
+                    self.on_start_callback(email=email)
+                else:
+                    self.on_start_callback()
             else:
                 logger.warning("on_start_callback är inte satt!")
         elif command == "stop":

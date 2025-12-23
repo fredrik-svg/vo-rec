@@ -165,7 +165,7 @@ def wav_to_flac(wav_path: Path, gain: float = 1.0):
         return False, None, f"FLAC-filen är tom: {flac_path}"
     return True, flac_path, "ok"
 
-def upload_file(flac_path: Path):
+def upload_file(flac_path: Path, email: str = None, room: str = None):
     # Verifiera att filen existerar innan upload (gäller alla metoder)
     if not flac_path.exists():
         return False, f"Uppladdningsfel: Filen finns inte: {flac_path}"
@@ -209,9 +209,27 @@ def upload_file(flac_path: Path):
             headers = {}
             if N8N_AUTH_HEADER:
                 headers["Authorization"] = N8N_AUTH_HEADER
+            
+            # Förbered form data med fil och metadata
             with open(flac_path, "rb") as f:
                 files = {"file": (flac_path.name, f, "audio/flac")}
-                r = requests.post(N8N_WEBHOOK_URL, files=files, headers=headers, timeout=180)
+                data = {}
+                
+                # Lägg till filename
+                data["filename"] = flac_path.name
+                
+                # Lägg till email om den finns
+                if email:
+                    data["email"] = email
+                    logging.info(f"Skickar email till n8n: {email}")
+                
+                # Lägg till room om den finns
+                if room:
+                    data["room"] = room
+                    logging.info(f"Skickar room till n8n: {room}")
+                
+                r = requests.post(N8N_WEBHOOK_URL, files=files, data=data, headers=headers, timeout=180)
+            
             if r.status_code // 100 == 2:
                 return True, f"n8n webhook {r.status_code} → {flac_path.name}"
             else:
@@ -466,6 +484,7 @@ class App(tk.Tk):
         self._timer_job = None
         self.test_active = False
         self.recording_gain = 1.0  # Sparar gain-värdet som användes vid inspelning
+        self.current_email = None  # Email från MQTT-kommando för nuvarande inspelning
         
         # Konfigurationshanterare
         self.config_manager = ConfigManager() if MQTT_SUPPORT else None
@@ -502,8 +521,12 @@ class App(tk.Tk):
         self.meter.set_gain(gain)
     
     # ---------- MQTT Callbacks ----------
-    def mqtt_on_start(self):
+    def mqtt_on_start(self, email=None):
         """Hantera start-kommando från MQTT"""
+        # Spara email för denna inspelningssession
+        self.current_email = email
+        if email:
+            logging.info(f"Start-kommando mottaget med email: {email}")
         # Schemalägg kommando i main thread (Tkinter är inte trådsäker)
         self.after(0, self.on_start)
     
@@ -620,7 +643,10 @@ class App(tk.Tk):
     def _convert_and_upload(self):
         wav = self.current_wav
         gain = self.recording_gain  # Hämta gain-värdet som sparades vid inspelningsstart
+        email = self.current_email  # Hämta email från MQTT-kommando
         self.current_wav = None
+        self.current_email = None  # Rensa email efter användning
+        
         if not wav or not wav.exists():
             self.flash_status("Fil saknas efter stopp", warn=True)
             if self.mqtt_client:
@@ -642,7 +668,13 @@ class App(tk.Tk):
         if self.mqtt_client:
             self.mqtt_client.publish_status("uploading")
         
-        ok, info = upload_file(flac_path)
+        # Hämta room från konfiguration om den finns
+        room = None
+        if self.config_manager:
+            room = self.config_manager.get("room")
+        
+        # Skicka med email och room till upload
+        ok, info = upload_file(flac_path, email=email, room=room)
         if ok:
             self.flash_status(f"Klar! Uppladdad: {info}")
             if self.mqtt_client:
