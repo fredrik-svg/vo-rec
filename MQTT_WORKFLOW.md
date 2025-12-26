@@ -120,11 +120,34 @@ meetrec/device1/config
 
 ## Command Messages
 
-| Command | Description |
-|---------|-------------|
-| `start` | Start a new recording |
-| `stop` | Stop current recording and upload |
-| `test` | Toggle audio level testing |
+Commands kan skickas i två format:
+
+### 1. JSON-format (rekommenderat)
+```json
+// Start-kommando med email
+{"command": "start", "email": "anna@example.com"}
+
+// Stop-kommando
+{"command": "stop"}
+
+// Status-förfrågan
+{"command": "status"}
+```
+
+### 2. Textformat (bakåtkompatibilitet)
+```
+start
+stop
+test
+```
+
+| Command | JSON Format | Description |
+|---------|-------------|-------------|
+| `start` | `{"command": "start", "email": "user@example.com"}` | Start a new recording with optional email |
+| `stop` | `{"command": "stop"}` | Stop current recording and upload |
+| `test` | `{"command": "test"}` | Toggle audio level testing |
+
+**Notera:** Email-parametern är valfri i start-kommandot. När email anges skickas det med till n8n webhook tillsammans med filnamn och rum.
 
 ## Configuration Parameters
 
@@ -138,11 +161,45 @@ meetrec/device1/config
 | `wifi_ssid` | string | WiFi network name |
 | `wifi_password` | string | WiFi password (stored securely) |
 
+## n8n Webhook Integration
+
+När en inspelning är klar och laddas upp till n8n, skickas följande data som multipart form data:
+
+```
+file: [FLAC audio file]
+filename: "meeting-20251223.flac"
+email: "anna@example.com"  (om angivet i start-kommandot)
+room: "badhuset"  (om konfigurerat via DEVICE_ROOM eller MQTT)
+```
+
+### Exempel på n8n Workflow
+
+1. **Webhook Node** - Ta emot filen och metadata
+   - Method: POST
+   - Path: /webhook/your-id
+   - Response Mode: "Immediately"
+
+2. **Extract Binary Data** - Hämta ljudfilen
+   - Binary Property: `file`
+
+3. **Set Node** - Extrahera metadata
+   ```json
+   {
+     "filename": "{{ $json.filename }}",
+     "email": "{{ $json.email }}",
+     "room": "{{ $json.room }}"
+   }
+   ```
+
+4. **Email Node** - Skicka till användaren
+   - To: `{{ $json.email }}`
+   - Subject: `Mötesinsplening från {{ $json.room }}`
+
 ## Example: Home Assistant Automation
 
 ```yaml
 automation:
-  - alias: "Start meeting recording"
+  - alias: "Start meeting recording with email"
     trigger:
       - platform: state
         entity_id: calendar.meetings
@@ -151,7 +208,18 @@ automation:
       - service: mqtt.publish
         data:
           topic: "meetrec/device1/command"
-          payload: "start"
+          payload: '{"command": "start", "email": "{{ state_attr(''calendar.meetings'', ''email'') }}"}'
+  
+  - alias: "Start meeting recording (simple)"
+    trigger:
+      - platform: state
+        entity_id: calendar.meetings
+        to: "on"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "meetrec/device1/command"
+          payload: '{"command": "start"}'
   
   - alias: "Stop meeting recording"
     trigger:
@@ -162,7 +230,7 @@ automation:
       - service: mqtt.publish
         data:
           topic: "meetrec/device1/command"
-          payload: "stop"
+          payload: '{"command": "stop"}'
   
   - alias: "Notify on recording complete"
     trigger:

@@ -216,6 +216,26 @@ Enheten använder följande topics (med prefix `meetrec/device1` som exempel):
 
 **Kommandon (subscribe):**
 - `meetrec/device1/command` - Skicka kommandon till enheten
+
+**Kommandoformat:**
+Kommandon kan skickas i JSON-format (rekommenderat) eller som ren text (bakåtkompatibilitet).
+
+JSON-format:
+```json
+// Start med email
+{"command": "start", "email": "anna@example.com"}
+
+// Start utan email
+{"command": "start"}
+
+// Stop
+{"command": "stop"}
+
+// Test
+{"command": "test"}
+```
+
+Textformat (bakåtkompatibilitet):
   - `start` - Starta inspelning
   - `stop` - Stoppa inspelning och ladda upp
   - `test` - Starta/stoppa nivåtest
@@ -261,11 +281,20 @@ Skicka ett JSON-meddelande till `meetrec/device1/config/set`:
 ### Exempel med mosquitto_pub
 
 ```bash
-# Starta inspelning
+# Starta inspelning med email (JSON-format)
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" \
+  -m '{"command": "start", "email": "anna@example.com"}'
+
+# Starta inspelning utan email (JSON-format)
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" \
+  -m '{"command": "start"}'
+
+# Starta inspelning (textformat, bakåtkompatibilitet)
 mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "start"
 
 # Stoppa inspelning
-mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "stop"
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" \
+  -m '{"command": "stop"}'
 
 # Uppdatera rum
 mosquitto_pub -h mqtt.example.com -t "meetrec/device1/config/set" -m '{"room":"Konferensrum C"}'
@@ -273,6 +302,22 @@ mosquitto_pub -h mqtt.example.com -t "meetrec/device1/config/set" -m '{"room":"K
 # Lyssna på status
 mosquitto_sub -h mqtt.example.com -t "meetrec/device1/#"
 ```
+
+### n8n Webhook Integration
+
+När en inspelning laddas upp till n8n (UPLOAD_TARGET=n8n), skickas följande data:
+
+**Multipart form data:**
+- `file` - FLAC-ljudfilen
+- `filename` - Filnamn (t.ex. "meeting-20251223.flac")
+- `email` - Email från MQTT start-kommando (om angivet)
+- `room` - Rum från DEVICE_ROOM konfiguration (om angivet)
+
+**Exempel på n8n-workflow:**
+1. Webhook node tar emot POST med multipart/form-data
+2. Använd `{{ $json.email }}` för att skicka till rätt användare
+3. Använd `{{ $json.room }}` för att identifiera vilket rum
+4. Använd `{{ $json.filename }}` för filnamn
 
 ### Felsökning MQTT-kommandon
 
