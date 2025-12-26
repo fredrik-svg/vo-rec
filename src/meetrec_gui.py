@@ -591,7 +591,7 @@ class App(tk.Tk):
         if current_state == "recording":
             if self.current_wav:
                 extra_data["filename"] = self.current_wav.name
-            if self.record_start:
+            if self.record_start is not None:
                 elapsed = int(time.time() - self.record_start)
                 extra_data["recording_duration"] = elapsed
             if self.config_manager:
@@ -602,7 +602,7 @@ class App(tk.Tk):
                 extra_data["email"] = self.current_email
         elif current_state == "testing":
             extra_data["test_mode"] = True
-            extra_data["channels"] = self.meter.num_channels if hasattr(self, 'meter') else 0
+            extra_data["channels"] = self.meter.num_channels if (hasattr(self, 'meter') and self.meter) else 0
         
         # Publicera status
         self.mqtt_client.publish_status(current_state, extra_data)
