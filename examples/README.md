@@ -72,6 +72,43 @@ Testar:
 - Bakåtkompatibilitet med textkommandon
 - Olika JSON-format och edge cases
 
+### MQTT Status Command Test
+`mqtt_status_command_test.py` - Testar status-förfrågan via MQTT.
+
+```bash
+python3 examples/mqtt_status_command_test.py
+```
+
+Testar:
+- Status-kommando i JSON-format
+- Status-kommando i textformat
+- Case-insensitive hantering
+- Koexistens med andra kommandon
+
+### Interactive MQTT Test
+`mqtt_interactive_test.py` - Interaktiv testmiljö för MQTT-kommandon.
+
+```bash
+# Sätt miljövariabler (eller redigera skriptet)
+export MQTT_BROKER=mqtt.example.com
+export MQTT_PORT=8883
+export MQTT_USERNAME=your_username
+export MQTT_PASSWORD=your_password
+export MQTT_TOPIC_PREFIX=meetrec/device1
+export MQTT_USE_TLS=true
+
+# Kör interaktivt test
+python3 examples/mqtt_interactive_test.py
+```
+
+Funktioner:
+- Skicka status-förfrågan (JSON och textformat)
+- Starta/stoppa inspelningar
+- Starta inspelning med email
+- Testa ljudnivåer
+- Se alla mottagna meddelanden
+- Realtidsövervakning av enhetsstatus
+
 ### Integration Test
 `integration_test_email_flow.py` - Testar hela flödet från MQTT till upload.
 

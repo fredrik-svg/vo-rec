@@ -501,7 +501,8 @@ class App(tk.Tk):
                         on_start=self.mqtt_on_start,
                         on_stop=self.mqtt_on_stop,
                         on_test=self.mqtt_on_test,
-                        on_config_update=self.mqtt_on_config_update
+                        on_config_update=self.mqtt_on_config_update,
+                        on_status=self.mqtt_on_status
                     )
                     self.mqtt_client.connect()
                     # Publicera initial konfiguration
@@ -558,6 +559,54 @@ class App(tk.Tk):
             self.mqtt_client.publish_config(self.config_manager.get_all())
         
         logging.info(f"Konfiguration uppdaterad via MQTT: {list(config_updates.keys())}")
+    
+    def mqtt_on_status(self):
+        """Hantera status-förfrågan från MQTT"""
+        # Schemalägg i main thread (Tkinter är inte trådsäker)
+        self.after(0, self.publish_current_status)
+    
+    def get_current_state(self):
+        """
+        Hämta enhetens nuvarande tillstånd.
+        
+        Returns:
+            str: Nuvarande status (ready, recording, testing, etc.)
+        """
+        if self.record_proc is not None:
+            return "recording"
+        elif self.test_active:
+            return "testing"
+        else:
+            return "ready"
+    
+    def publish_current_status(self):
+        """Publicera nuvarande status till MQTT när det begärs"""
+        if not self.mqtt_client:
+            return
+        
+        current_state = self.get_current_state()
+        extra_data = {}
+        
+        # Lägg till ytterligare information baserat på tillstånd
+        if current_state == "recording":
+            if self.current_wav:
+                extra_data["filename"] = self.current_wav.name
+            if self.record_start is not None:
+                elapsed = int(time.time() - self.record_start)
+                extra_data["recording_duration"] = elapsed
+            if self.config_manager:
+                room = self.config_manager.get("room", "")
+                if room:
+                    extra_data["room"] = room
+            if self.current_email:
+                extra_data["email"] = self.current_email
+        elif current_state == "testing":
+            extra_data["test_mode"] = True
+            extra_data["channels"] = self.meter.num_channels if (hasattr(self, 'meter') and self.meter) else 0
+        
+        # Publicera status
+        self.mqtt_client.publish_status(current_state, extra_data)
+        logging.info(f"Status publicerad på förfrågan: {current_state}")
     
     def on_test_levels(self):
         if self.record_proc is not None:

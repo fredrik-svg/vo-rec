@@ -110,6 +110,7 @@ class MQTTClient:
         self.on_stop_callback: Optional[Callable] = None
         self.on_test_callback: Optional[Callable] = None
         self.on_config_update_callback: Optional[Callable[[Dict], None]] = None
+        self.on_status_callback: Optional[Callable] = None
         
         # Client (skapas bara om enabled)
         self.client = None
@@ -267,6 +268,13 @@ class MQTTClient:
                 self.on_test_callback()
             else:
                 logger.warning("on_test_callback är inte satt!")
+        elif command == "status":
+            logger.info("MQTT kommando: Status-förfrågan")
+            if self.on_status_callback:
+                logger.info("Anropar on_status_callback")
+                self.on_status_callback()
+            else:
+                logger.warning("on_status_callback är inte satt!")
         else:
             logger.warning(f"Okänt MQTT kommando: {command}")
     
@@ -334,7 +342,8 @@ class MQTTClient:
                      on_start: Optional[Callable] = None,
                      on_stop: Optional[Callable] = None, 
                      on_test: Optional[Callable] = None,
-                     on_config_update: Optional[Callable[[Dict], None]] = None):
+                     on_config_update: Optional[Callable[[Dict], None]] = None,
+                     on_status: Optional[Callable] = None):
         """
         Sätt callback-funktioner för kommandohantering.
         
@@ -343,6 +352,7 @@ class MQTTClient:
             on_stop: Funktion att anropa vid stopp-kommando
             on_test: Funktion att anropa vid test-kommando
             on_config_update: Funktion att anropa vid konfigurationsuppdatering
+            on_status: Funktion att anropa vid status-förfrågan
         """
         if on_start:
             self.on_start_callback = on_start
@@ -352,6 +362,8 @@ class MQTTClient:
             self.on_test_callback = on_test
         if on_config_update:
             self.on_config_update_callback = on_config_update
+        if on_status:
+            self.on_status_callback = on_status
 
 
 def get_mqtt_config_from_env() -> Dict[str, Any]:
