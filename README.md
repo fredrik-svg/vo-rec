@@ -233,12 +233,16 @@ JSON-format:
 
 // Test
 {"command": "test"}
+
+// Status-förfrågan
+{"command": "status"}
 ```
 
 Textformat (bakåtkompatibilitet):
   - `start` - Starta inspelning
   - `stop` - Stoppa inspelning och ladda upp
   - `test` - Starta/stoppa nivåtest
+  - `status` - Begär aktuell enhetsstatus (enheten svarar med statusmeddelande)
 
 **Status (publish):**
 - `meetrec/device1/status` - Enhetens aktuella status
@@ -248,6 +252,25 @@ Textformat (bakåtkompatibilitet):
   - `converting` - Konverterar WAV→FLAC
   - `uploading` - Laddar upp
   - `error` - Fel uppstod
+  - `testing` - Nivåtest pågår
+
+**Status-förfrågan:**
+När ett `status`-kommando tas emot publicerar enheten sin aktuella status till `meetrec/device1/status` med ytterligare information:
+- Vid `recording`: inkluderar `filename`, `recording_duration`, `room`, `email`
+- Vid `testing`: inkluderar `test_mode`, `channels`
+- Vid `ready`: grundläggande statusinformation
+
+Exempel på status-svar:
+```json
+// Vid inspelning
+{"status": "recording", "filename": "meeting-20251226.wav", "recording_duration": 45, "room": "Konferensrum A"}
+
+// Vid testläge
+{"status": "testing", "test_mode": true, "channels": 4}
+
+// Vid ready
+{"status": "ready"}
+```
 
 **Konfiguration:**
 - `meetrec/device1/config` - Nuvarande konfiguration (publish)
@@ -295,6 +318,13 @@ mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "start"
 # Stoppa inspelning
 mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" \
   -m '{"command": "stop"}'
+
+# Begär aktuell status (JSON-format)
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" \
+  -m '{"command": "status"}'
+
+# Begär aktuell status (textformat)
+mosquitto_pub -h mqtt.example.com -t "meetrec/device1/command" -m "status"
 
 # Uppdatera rum
 mosquitto_pub -h mqtt.example.com -t "meetrec/device1/config/set" -m '{"room":"Konferensrum C"}'

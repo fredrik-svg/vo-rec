@@ -87,6 +87,28 @@ meetrec/device1/status
 meetrec/device1/recording
 ```
 
+## Status Query Flow
+
+```
+User/System
+    |
+    | publish: {"command": "status"} or "status"
+    v
+meetrec/device1/command
+    |
+    v
+Device receives status request
+    |
+    v
+Device determines current state
+    |
+    | publish: {"status": "recording", "filename": "...", "recording_duration": 45, ...}
+    | or: {"status": "ready"}
+    | or: {"status": "testing", "test_mode": true, "channels": 4}
+    v
+meetrec/device1/status
+```
+
 ## Configuration Update Flow
 
 ```
@@ -113,6 +135,7 @@ meetrec/device1/config
 |--------|-------------|
 | `ready` | Device is ready to record |
 | `recording` | Recording in progress |
+| `testing` | Audio level testing in progress |
 | `processing` | Stopped, processing file |
 | `converting` | Converting WAV to FLAC |
 | `uploading` | Uploading to cloud |
@@ -139,6 +162,7 @@ Commands kan skickas i två format:
 start
 stop
 test
+status
 ```
 
 | Command | JSON Format | Description |
@@ -146,6 +170,7 @@ test
 | `start` | `{"command": "start", "email": "user@example.com"}` | Start a new recording with optional email |
 | `stop` | `{"command": "stop"}` | Stop current recording and upload |
 | `test` | `{"command": "test"}` | Toggle audio level testing |
+| `status` | `{"command": "status"}` | Request current device status (device responds with status message) |
 
 **Notera:** Email-parametern är valfri i start-kommandot. När email anges skickas det med till n8n webhook tillsammans med filnamn och rum.
 
